@@ -13,11 +13,16 @@ h1{font-size:19px;margin:4px 0 12px}
       border-radius:12px;padding:12px 14px;margin:0 0 10px}
 .card h2{font-size:15px;margin:0 0 3px}
 .note{color:var(--tg-theme-hint-color,#5b6b7b);font-size:12px;margin:0 0 8px}
-select,input{padding:7px 9px;margin:0 6px 8px 0;border:1px solid rgba(128,128,128,.35);
-             border-radius:8px;font-size:14px;background:var(--tg-theme-bg-color,#fff);
-             color:var(--tg-theme-text-color,#1c2733)}
+select,input{display:block;width:100%;box-sizing:border-box;padding:9px 10px;margin:0 0 8px;
+             border:1px solid rgba(128,128,128,.35);border-radius:8px;font-size:15px;
+             background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#1c2733)}
+.two{display:flex;gap:8px}
+.two input{margin-bottom:8px;min-width:0}
+.fixed{font-size:13px;color:var(--tg-theme-hint-color,#5b6b7b);margin:0 0 6px}
+.hint{font-size:12px;color:var(--tg-theme-hint-color,#5b6b7b);margin:2px 0 4px}
 button{background:var(--tg-theme-button-color,#1f4e78);color:var(--tg-theme-button-text-color,#fff);
-       border:0;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer;display:block}
+       border:0;border-radius:8px;padding:11px 16px;font-size:15px;cursor:pointer;display:block;
+       width:100%;box-sizing:border-box}
 .warn{background:#fff2cc;border:1px solid #e3cf7a;border-radius:10px;padding:10px 12px;
       font-size:13px;color:#5b4a12;margin-bottom:12px;display:none}
 .foot{color:var(--tg-theme-hint-color,#8492a0);font-size:11px;margin-top:14px}
@@ -36,6 +41,9 @@ const MONTHS=["январь","февраль","март","апрель","май"
               "июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 const DIRS={smartmed:"СмартМед",smartlab:"СмартЛаб",allergolab:"Аллерголаб",invitro:"InvitroGO"};
 const REPORTS=[
+ {key:"stage_errors",title:"🟢 Ошибки стадий продаж",
+  note:"продажи дня/периода: кто не доведён до продающей стадии, поимённо (~1 мин)",
+  dirs:["smartmed"],params:"range"},
  {key:"daily",title:"🟢 Сводка дня по источникам",
   note:"то же, что приходит в 13:00/22:00, внеочередной прогон (~2 мин)",
   dirs:["smartmed"],params:null},
@@ -81,14 +89,15 @@ REPORTS.forEach(r=>{
   if(r.dirs.length>1){
     controls+=`<select id="dir_${r.key}">`+r.dirs.map(d=>`<option value="${d}">${DIRS[d]}</option>`).join("")+`</select>`;
   } else {
-    controls+=`<label>${DIRS[r.dirs[0]]}</label> `;
+    controls+=`<div class="fixed">${DIRS[r.dirs[0]]}</div>`;
   }
   if(r.params==="month") controls+=`<select id="month_${r.key}">${monthOptions()}</select>`;
-  if(r.params==="range") controls+=`с <input type="date" id="from_${r.key}" value="${isoShift(-1)}">
-                                    по <input type="date" id="to_${r.key}" value="${isoShift(-1)}">`;
-  if(r.params==="month_or_range") controls+=`месяц <select id="month_${r.key}">${monthOptions()}</select><br>
-                                    или период: с <input type="date" id="from_${r.key}">
-                                    по <input type="date" id="to_${r.key}">`;
+  if(r.params==="range") controls+=`<div class="hint">Период (с — по):</div>
+    <div class="two"><input type="date" id="from_${r.key}" value="${isoShift(-1)}">
+    <input type="date" id="to_${r.key}" value="${isoShift(-1)}"></div>`;
+  if(r.params==="month_or_range") controls+=`<select id="month_${r.key}">${monthOptions()}</select>
+    <div class="hint">…или свой период — заполните обе даты:</div>
+    <div class="two"><input type="date" id="from_${r.key}"><input type="date" id="to_${r.key}"></div>`;
   div.innerHTML=`<h2>${r.title}</h2><p class="note">${r.note}</p>${controls}
                  <button onclick="run('${r.key}')">Получить в Telegram</button>`;
   cards.appendChild(div);
