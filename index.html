@@ -53,7 +53,10 @@ const REPORTS=[
   dirs:["smartmed"],params:null},
 ];
 const tg=window.Telegram&&window.Telegram.WebApp;
-if(!tg||!tg.initData){document.getElementById("warn").style.display="block";}
+// признак «внутри Telegram»: платформа задана. initData у приложений,
+// открытых кнопкой клавиатуры, ПУСТОЙ — это норма, sendData всё равно работает.
+const inTg=!!(tg&&tg.platform&&tg.platform!=="unknown");
+if(!inTg){document.getElementById("warn").style.display="block";}
 if(tg){tg.ready();tg.expand();}
 
 function monthOptions(){
@@ -96,7 +99,7 @@ function run(key){
     if(!payload.from||!payload.to){alert("Выберите даты");return;}
     if(payload.from>payload.to){const t=payload.from;payload.from=payload.to;payload.to=t;}
   }
-  if(tg&&tg.initData){tg.sendData(JSON.stringify(payload));}
+  if(inTg){tg.sendData(JSON.stringify(payload));}
   else{alert("Откройте страницу через кнопку в Telegram-боте");}
 }
 </script>
