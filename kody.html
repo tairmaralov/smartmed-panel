@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Коды креативов SmartLab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Дашборд кодов креативов SmartLab. Данные читаются при каждом открытии прямо
+   из Google-таблицы кодов (листы «По дням» и «Расход»); таблицу 6 раз в день
+   обновляет сервер, расход — выгрузка Meta (deploy/fetch_meta_daily.py). */
+:root{
+  color-scheme:light;
+  --bg:#F3F6F8; --panel:#FFFFFF; --panel2:#EBF0F4; --ink:#16212B; --muted:#5E6B78;
+  --line:#D9E0E6; --accent:#1F5F8B; --accent-ink:#FFFFFF;
+  --good:#2E7D5B; --warn:#A8701A; --bad:#B3432F;
+  --good-bg:#E4F2EA; --warn-bg:#F7EEDC; --bad-bg:#F6E3DF;
+  /* цвета крышек вакуумных пробирок — тема анализа */
+  --t-thyroid:#C9A227; --t-anemia:#8E7CC3; --t-gastro:#3F9A6B;
+  --t-biochem:#C2453A; --t-organic:#4A90C2; --t-other:#9AA4AE;
+  --shadow:0 1px 2px rgba(22,33,43,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F161C; --panel:#172029; --panel2:#1D2833; --ink:#E6ECF1; --muted:#93A1AE;
+    --line:#2A3743; --accent:#6FA8D6; --accent-ink:#0F161C;
+    --good:#5DBB8C; --warn:#E0A64A; --bad:#E3796A;
+    --good-bg:#16302A; --warn-bg:#33291A; --bad-bg:#3A221F;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F161C; --panel:#172029; --panel2:#1D2833; --ink:#E6ECF1; --muted:#93A1AE;
+  --line:#2A3743; --accent:#6FA8D6; --accent-ink:#0F161C;
+  --good:#5DBB8C; --warn:#E0A64A; --bad:#E3796A;
+  --good-bg:#16302A; --warn-bg:#33291A; --bad-bg:#3A221F;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:0 16px 48px;
+  padding-bottom:calc(48px + env(safe-area-inset-bottom,0px));
+  font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:1180px; margin:0 auto}
+header.top{padding:22px 0 10px; display:flex; flex-wrap:wrap; gap:6px 18px; align-items:baseline}
+h1{font:500 21px/1.2 "Unbounded","IBM Plex Sans",sans-serif; margin:0; letter-spacing:.005em; text-wrap:balance}
+.fresh{color:var(--muted); font-size:13px}
+.back{margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none}
+.back:hover{text-decoration:underline}
+
+/* панель периода */
+.controls{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:5;
+  background:var(--bg); padding:10px 0 12px; border-bottom:1px solid var(--line);
+  display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center;
+}
+.range{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.range label{font-size:13px; color:var(--muted)}
+input[type=date]{
+  font:inherit; font-size:14px; color:var(--ink); background:var(--panel);
+  border:1px solid var(--line); border-radius:8px; padding:6px 8px;
+}
+.presets{display:flex; gap:6px; flex-wrap:wrap}
+button.p{
+  font:inherit; font-size:13px; font-weight:500; color:var(--ink); background:var(--panel);
+  border:1px solid var(--line); border-radius:999px; padding:5px 12px; cursor:pointer;
+}
+button.p:hover{border-color:var(--accent)}
+button.p.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.toggle{display:flex; gap:7px; align-items:center; font-size:14px; cursor:pointer; user-select:none}
+.toggle input{width:17px; height:17px; accent-color:var(--accent); margin:0}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* итог по таргету */
+.summary{margin:18px 0 6px}
+.summary h2, section h2{font-size:15px; font-weight:600; margin:0 0 10px; color:var(--muted)}
+.tiles{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:12px; overflow:hidden}
+.tile{background:var(--panel); padding:12px 14px 13px}
+.tile .v{font-size:24px; font-weight:600; line-height:1.15; white-space:nowrap}
+.tile .l{font-size:13px; color:var(--muted); margin-top:2px}
+.tile.key .v{color:var(--accent)}
+.split{margin:10px 2px 0; font-size:14px; color:var(--muted); display:flex; flex-wrap:wrap; gap:4px 18px}
+.split b{color:var(--ink); font-weight:600}
+.note{margin:10px 0 0; padding:9px 12px; border-radius:8px; font-size:13.5px;
+  background:var(--warn-bg); color:var(--ink); border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+
+section{margin-top:26px}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--panel); box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; min-width:860px; font-size:14px}
+th,td{padding:8px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line)}
+th:nth-child(-n+3), td:nth-child(-n+3){text-align:left}
+thead th{font-size:12.5px; font-weight:600; color:var(--muted); background:var(--panel2); cursor:pointer; position:relative}
+thead th:hover{color:var(--ink)}
+thead th[aria-sort="ascending"]::after{content:" ▲"; font-size:10px}
+thead th[aria-sort="descending"]::after{content:" ▼"; font-size:10px}
+th:first-child, td:first-child{position:sticky; left:0; background:inherit; z-index:1}
+thead th:first-child{background:var(--panel2)}
+tbody tr{background:var(--panel)}
+tbody tr:hover{background:var(--panel2)}
+td.code{font-weight:600}
+tfoot tr{background:var(--panel2)}
+tfoot td{font-weight:600; border-bottom:none}
+tfoot tr + tr td{border-top:1px solid var(--line)}
+.dim{color:var(--muted)}
+.tube{display:inline-flex; align-items:center; gap:7px}
+.cap{width:10px; height:14px; border-radius:3px 3px 5px 5px; background:var(--c,var(--t-other)); flex:none;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.14)}
+.pill{display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:999px}
+.pill.on{background:var(--good-bg); color:var(--good)}
+.pill.off{background:var(--panel2); color:var(--muted)}
+.cps{font-weight:600}
+.cps.good{color:var(--good)} .cps.warn{color:var(--warn)} .cps.bad{color:var(--bad)}
+
+/* полосы по анализам */
+.bars{display:grid; gap:12px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 16px 12px}
+.bar{display:grid; grid-template-columns:150px 1fr 110px; gap:12px; align-items:center}
+.bar .name{display:flex; align-items:center; gap:8px; font-weight:600}
+.track{position:relative; height:22px; background:var(--panel2); border-radius:5px}
+.fill{position:absolute; left:0; top:0; bottom:0; border-radius:5px; background:var(--c)}
+.ref{position:absolute; top:-5px; bottom:-5px; width:0; border-left:2px dashed var(--ink); opacity:.55}
+.bar .val{text-align:right; font-weight:600}
+.bar .sub{grid-column:2 / 4; font-size:12.5px; color:var(--muted); margin-top:-6px}
+.legend{font-size:12.5px; color:var(--muted); display:flex; gap:6px; align-items:center; margin-top:2px}
+.legend i{display:inline-block; width:0; height:14px; border-left:2px dashed var(--ink); opacity:.55}
+
+.foot{margin-top:26px; font-size:13px; color:var(--muted); max-width:72ch}
+.foot a{color:var(--accent)}
+.state{margin-top:40px; padding:18px; border:1px dashed var(--line); border-radius:12px; color:var(--muted)}
+
+@media (max-width:860px){
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:520px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tile .v{font-size:20px}
+  .bar{grid-template-columns:1fr 84px}
+  .bar .track{grid-column:1 / 3; grid-row:2}
+  .bar .sub{grid-column:1 / 3; margin-top:-4px}
+  h1{font-size:18px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .fill{transition:width .35s ease}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Коды креативов SmartLab</h1>
+    <span class="fresh" id="fresh">Загружаю данные…</span>
+    <a class="back" href="./">Панель отчётов</a>
+  </header>
+
+  <div class="controls" role="group" aria-label="Период">
+    <div class="range">
+      <label for="from">с</label><input type="date" id="from">
+      <label for="to">по</label><input type="date" id="to">
+    </div>
+    <div class="presets" id="presets">
+      <button class="p" data-p="today" type="button">Сегодня</button>
+      <button class="p" data-p="yesterday" type="button">Вчера</button>
+      <button class="p" data-p="7" type="button">7 дней</button>
+      <button class="p" data-p="14" type="button">14 дней</button>
+      <button class="p" data-p="month" type="button">Этот месяц</button>
+      <button class="p" data-p="all" type="button">Всё время</button>
+    </div>
+    <label class="toggle" for="noweekend"><input type="checkbox" id="noweekend">Без субботы и воскресенья</label>
+  </div>
+
+  <div id="app"></div>
+
+  <p class="foot">
+    Лиды считаются по дню обращения, продажи — по дню продажи из таблиц менеджеров.
+    Бюджет — расход кабинета SmartLab2 по кампаниям; код крео берётся из названия кампании,
+    бюджет кампаний «Подписка» отнесён к органике Instagram (код 340222).
+    «Открутка» — был ли расход по кампании в последний день периода, за который есть бюджет.
+    Источник: <a href="https://docs.google.com/spreadsheets/d/1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas/edit" target="_blank" rel="noopener">таблица кодов SmartLab</a>.
+  </p>
+</div>
+
+<script>
+const SHEET = "1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas";
+const ORGANIC = "340222";
+const NOCODE = "без кода";
+const THEMES = {
+  "щитовидка": "--t-thyroid", "анемия": "--t-anemia", "гастро": "--t-gastro",
+  "биохимия": "--t-biochem", "органика Instagram": "--t-organic"
+};
+
+const csvUrl = (tab) => `https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+
+function parseCSV(text){
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ","){ row.push(cell); cell = ""; }
+    else if (ch === "\n"){ row.push(cell); rows.push(row); row = []; cell = ""; }
+    else if (ch !== "\r") cell += ch;
+  }
+  if (cell !== "" || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+const num = (s) => { const v = parseFloat(String(s ?? "").replace(/\s/g,"").replace(",", ".")); return isFinite(v) ? v : 0; };
+const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+const money = new Intl.NumberFormat("ru-RU", {minimumFractionDigits:2, maximumFractionDigits:2});
+const int = new Intl.NumberFormat("ru-RU");
+const usd = (v) => "$" + money.format(v);
+const pct = (v) => (v*100).toLocaleString("ru-RU", {maximumFractionDigits: v < .1 ? 1 : 1}) + "%";
+
+let DAYS = [], SPEND = [], TAG = {}, MAXD = "", MAXS = "";
+let sortKey = "cps", sortDir = 1;
+
+function store(k, v){ try{ localStorage.setItem("kody:"+k, JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ const v = localStorage.getItem("kody:"+k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function addDays(s, n){ const [y,m,d] = s.split("-").map(Number); return ymd(new Date(y, m-1, d+n)); }
+function weekday(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d).getDay(); }
+function ru(s){ const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; }
+
+async function init(){
+  try{
+    const [a, b] = await Promise.all([fetch(csvUrl("По дням")), fetch(csvUrl("Расход"))]);
+    if (!a.ok) throw new Error("лист «По дням» не открылся");
+    DAYS = parseCSV(await a.text()).slice(1)
+      .filter(r => isDate(r[0])).map(r => ({d:r[0], code:r[1].trim(), leads:num(r[2]), sales:num(r[3])}));
+    SPEND = b.ok ? parseCSV(await b.text()).slice(1)
+      .filter(r => isDate(r[0])).map(r => ({d:r[0], camp:r[1], code:r[2].trim(), theme:r[3].trim(), spend:num(r[4])})) : [];
+  }catch(e){
+    document.getElementById("app").innerHTML =
+      `<div class="state">Не получилось загрузить таблицу кодов (${e.message}). Проверьте интернет и обновите страницу.</div>`;
+    document.getElementById("fresh").textContent = "";
+    return;
+  }
+  for (const s of SPEND) if (s.code && s.theme && !TAG[s.code]) TAG[s.code] = s.theme;
+  TAG[ORGANIC] = "органика Instagram";
+  MAXD = DAYS.reduce((m, r) => r.d > m ? r.d : m, "");
+  MAXS = SPEND.reduce((m, r) => r.d > m ? r.d : m, "");
+  document.getElementById("fresh").textContent =
+    `лиды и продажи по ${ru(MAXD)}` + (MAXS ? `, бюджет по ${ru(MAXS)}` : ", бюджета пока нет");
+
+  const saved = load("range");
+  if (saved && isDate(saved.from) && isDate(saved.to)){ setRange(saved.from, saved.to, saved.preset); }
+  else applyPreset("7");
+  document.getElementById("noweekend").checked = !!load("noweekend");
+  render();
+}
+
+function applyPreset(p){
+  const end = MAXD || ymd(new Date());
+  let from = end, to = end;
+  if (p === "yesterday"){ from = to = addDays(end, -1); }
+  else if (p === "7"){ from = addDays(end, -6); }
+  else if (p === "14"){ from = addDays(end, -13); }
+  else if (p === "month"){ from = end.slice(0,8) + "01"; }
+  else if (p === "all"){ from = DAYS.reduce((m, r) => !m || r.d < m ? r.d : m, ""); }
+  setRange(from, to, p);
+}
+function setRange(from, to, preset){
+  document.getElementById("from").value = from;
+  document.getElementById("to").value = to;
+  document.querySelectorAll("button.p").forEach(b => b.classList.toggle("on", b.dataset.p === preset));
+  store("range", {from, to, preset: preset || null});
+}
+
+function compute(){
+  let from = document.getElementById("from").value, to = document.getElementById("to").value;
+  if (from > to) [from, to] = [to, from];
+  const noWe = document.getElementById("noweekend").checked;
+  const inR = (d) => d >= from && d <= to && !(noWe && [0,6].includes(weekday(d)));
+  const rows = {};
+  const get = (c) => rows[c] || (rows[c] = {code:c, leads:0, sales:0, spend:0, lastSpend:null});
+  for (const r of DAYS) if (inR(r.d)){ const x = get(r.code); x.leads += r.leads; x.sales += r.sales; }
+  const spendDays = new Set();
+  for (const s of SPEND) if (inR(s.d) && s.code){ get(s.code).spend += s.spend; spendDays.add(s.d); }
+  // открутка: был ли расход в последний день периода, за который есть бюджет
+  const lastBudgetDay = [...spendDays].sort().pop() || null;
+  if (lastBudgetDay){
+    for (const s of SPEND) if (s.d === lastBudgetDay && s.code && s.spend > 0) get(s.code).lastSpend = true;
+  }
+  // дни периода (с учётом фильтра) — для покрытия бюджетом
+  let total = 0, cur = from;
+  while (cur <= to){ if (inR(cur)) total++; cur = addDays(cur, 1); }
+  const list = Object.values(rows).map(x => ({
+    ...x, theme: x.code === NOCODE ? "" : (TAG[x.code] || ""),
+    cpl: x.spend && x.leads ? x.spend / x.leads : null,
+    conv: x.leads ? x.sales / x.leads : null,
+    cps: x.spend && x.sales ? x.spend / x.sales : null,
+    status: x.code === NOCODE || !lastBudgetDay ? null : !!x.lastSpend
+  }));
+  return {from, to, noWe, list, budgetDays: spendDays.size, totalDays: total, lastBudgetDay};
+}
+
+function agg(items){
+  const s = items.reduce((a, x) => ({leads:a.leads+x.leads, sales:a.sales+x.sales, spend:a.spend+x.spend}), {leads:0, sales:0, spend:0});
+  return {...s, cpl: s.spend && s.leads ? s.spend/s.leads : null, conv: s.leads ? s.sales/s.leads : null,
+          cps: s.spend && s.sales ? s.spend/s.sales : null};
+}
+
+function grade(cps, ref){
+  if (cps == null || ref == null) return "";
+  return cps <= ref ? "good" : cps <= ref*1.5 ? "warn" : "bad";
+}
+
+function chip(theme){
+  const v = THEMES[theme] || "--t-other";
+  return `<span class="tube"><span class="cap" style="--c:var(${v})"></span>${theme || '<span class="dim">—</span>'}</span>`;
+}
+
+const COLS = [
+  ["code","Код"],["theme","Анализ"],["status","Открутка"],["spend","Бюджет"],["leads","Лидов"],
+  ["cpl","Цена лида"],["sales","Продаж"],["conv","Конверсия"],["cps","Цена продажи"]
+];
+
+function render(){
+  const R = compute();
+  const creo = R.list.filter(x => x.code !== ORGANIC && x.code !== NOCODE);
+  const T = agg(R.list), C = agg(creo);
+  const org = R.list.find(x => x.code === ORGANIC), nc = R.list.find(x => x.code === NOCODE);
+  const ref = T.cps;
+
+  const sorted = [...creo].sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (sortKey === "code") return sortDir * (Number(a.code) - Number(b.code));
+    if (sortKey === "theme") return sortDir * String(va).localeCompare(String(vb), "ru");
+    // пустые (нет продаж / нет бюджета) — всегда в конце
+    if (va == null && vb == null) return (b.spend - a.spend);
+    if (va == null) return 1; if (vb == null) return -1;
+    return sortDir * (va - vb) || (b.leads - a.leads);
+  });
+  const tail = [org, nc].filter(Boolean);
+
+  const cell = (x, k) => {
+    const v = x[k];
+    switch (k){
+      case "code": return `<td class="code">${x.code === ORGANIC ? "340222" : x.code}</td>`;
+      case "theme": return `<td>${x.code === NOCODE ? '<span class="dim">клиент не прислал код</span>' : chip(x.theme)}</td>`;
+      case "status": return `<td>${v == null ? '<span class="dim">—</span>' : v ? '<span class="pill on">идёт</span>' : '<span class="pill off">стоит</span>'}</td>`;
+      case "spend": return `<td>${x.spend ? usd(x.spend) : '<span class="dim">—</span>'}</td>`;
+      case "leads": case "sales": return `<td>${int.format(v)}</td>`;
+      case "cpl": return `<td>${v == null ? '<span class="dim">—</span>' : usd(v)}</td>`;
+      case "conv": return `<td>${v == null ? '<span class="dim">—</span>' : pct(v)}</td>`;
+      case "cps": return `<td>${v == null ? (x.spend ? '<span class="cps bad">нет продаж</span>' : '<span class="dim">—</span>')
+                          : `<span class="cps ${grade(v, ref)}">${usd(v)}</span>`}</td>`;
+    }
+  };
+  const tr = (x) => `<tr>${COLS.map(([k]) => cell(x, k)).join("")}</tr>`;
+  const totRow = (label, a) => `<tr><td>${label}</td><td></td><td></td><td>${a.spend ? usd(a.spend) : "—"}</td>
+    <td>${int.format(a.leads)}</td><td>${a.cpl == null ? "—" : usd(a.cpl)}</td><td>${int.format(a.sales)}</td>
+    <td>${a.conv == null ? "—" : pct(a.conv)}</td><td>${a.cps == null ? "—" : usd(a.cps)}</td></tr>`;
+
+  // по анализам
+  const byTheme = {};
+  for (const x of R.list){
+    if (x.code === NOCODE) continue;
+    const t = x.theme || "без темы";
+    (byTheme[t] = byTheme[t] || []).push(x);
+  }
+  const themes = Object.entries(byTheme).map(([t, xs]) => ({t, ...agg(xs)}))
+    .filter(t => t.spend || t.sales)
+    .sort((a, b) => (a.cps ?? Infinity) - (b.cps ?? Infinity));
+  const maxC = Math.max(ref || 0, ...themes.map(t => t.cps || 0)) * 1.08 || 1;
+  const bars = themes.map(t => {
+    const w = t.cps ? (t.cps / maxC * 100) : 0;
+    return `<div class="bar">
+      <div class="name">${chip(t.t)}</div>
+      <div class="track" aria-hidden="true">
+        <div class="fill" style="width:${w}%; --c:var(${THEMES[t.t] || "--t-other"})"></div>
+        ${ref ? `<div class="ref" style="left:${ref / maxC * 100}%"></div>` : ""}
+      </div>
+      <div class="val">${t.cps ? `<span class="cps ${grade(t.cps, ref)}">${usd(t.cps)}</span>` : '<span class="cps bad">нет продаж</span>'}</div>
+      <div class="sub">${t.spend ? usd(t.spend) + " · " : ""}${int.format(t.leads)} лидов · ${int.format(t.sales)} продаж${t.conv != null ? " · конверсия " + pct(t.conv) : ""}</div>
+    </div>`;
+  }).join("");
+
+  const coverage = R.budgetDays < R.totalDays
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. Выгрузка расхода из Facebook идёт с 23.09.2026 и не каждый день.</p>`
+    : "";
+
+  document.getElementById("app").innerHTML = `
+  <div class="summary">
+    <h2>Весь таргет: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
+    <div class="tiles">
+      <div class="tile"><div class="v">${T.spend ? usd(T.spend) : "—"}</div><div class="l">бюджет</div></div>
+      <div class="tile"><div class="v">${int.format(T.leads)}</div><div class="l">лидов</div></div>
+      <div class="tile"><div class="v">${T.cpl == null ? "—" : usd(T.cpl)}</div><div class="l">цена лида</div></div>
+      <div class="tile"><div class="v">${int.format(T.sales)}</div><div class="l">продаж</div></div>
+      <div class="tile"><div class="v">${T.conv == null ? "—" : pct(T.conv)}</div><div class="l">конверсия в продажу</div></div>
+      <div class="tile key"><div class="v">${T.cps == null ? "—" : usd(T.cps)}</div><div class="l">цена продажи</div></div>
+    </div>
+    <div class="split">
+      <span>с кодом крео: <b>${C.sales}</b> продаж${C.cps ? " по " + usd(C.cps) : ""}</span>
+      <span>органика Instagram: <b>${org ? org.sales : 0}</b></span>
+      <span>без кода: <b>${nc ? nc.sales : 0}</b></span>
+    </div>
+    ${coverage}
+  </div>
+
+  <section>
+    <h2>По кодам креативов</h2>
+    <div class="tablebox"><table>
+      <thead><tr>${COLS.map(([k, l]) => `<th scope="col" data-k="${k}" tabindex="0" aria-sort="${k === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none"}">${l}</th>`).join("")}</tr></thead>
+      <tbody>${sorted.map(tr).join("")}${tail.map(tr).join("")}</tbody>
+      <tfoot>${totRow("Итого крео", C)}${totRow("Весь таргет", T)}</tfoot>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Цена продажи по анализам</h2>
+    <div class="bars">${bars || '<div class="dim">В этом периоде нет ни бюджета, ни продаж.</div>'}
+      ${ref ? `<div class="legend"><i></i> средняя по всему таргету — ${usd(ref)}</div>` : ""}
+    </div>
+  </section>`;
+
+  document.querySelectorAll("thead th").forEach(th => {
+    const go = () => {
+      const k = th.dataset.k;
+      if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = ["leads","sales","spend","conv"].includes(k) ? -1 : 1; }
+      render();
+    };
+    th.addEventListener("click", go);
+    th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
+  });
+}
+
+document.getElementById("presets").addEventListener("click", e => {
+  const b = e.target.closest("button.p"); if (!b) return;
+  applyPreset(b.dataset.p); render();
+});
+for (const id of ["from", "to"]) document.getElementById(id).addEventListener("change", () => {
+  setRange(document.getElementById("from").value, document.getElementById("to").value, null); render();
+});
+document.getElementById("noweekend").addEventListener("change", e => { store("noweekend", e.target.checked); render(); });
+
+init();
+</script>
+</body>
+</html>
