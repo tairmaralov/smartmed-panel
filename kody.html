@@ -346,9 +346,14 @@ function compute(){
   const spendDays = new Set();
   // день, выгруженный в тот же день (он ещё шёл), — бюджет за него неполный
   const partial = {};
-  for (const s of SPEND) if (inR(s.d) && s.code){
-    get(s.code).spend += s.spend; spendDays.add(s.d);
+  // День «с бюджетом» = день, за который выгрузка ЕСТЬ, даже если реклама с кодами
+  // в него не крутилась. Раньше считались только дни с расходом по коду, и
+  // 12–15.09.2026 (открутка стояла, шла лишь «Подписка» без кода) выглядели как
+  // несработавшая выгрузка: «бюджет за 26 из 30 дн.» при полных данных (02.10.2026).
+  for (const s of SPEND) if (inR(s.d)){
+    spendDays.add(s.d);
     if (s.fetched && s.fetched.slice(0, 10) <= s.d) partial[s.d] = s.fetched.slice(11, 16);
+    if (s.code) get(s.code).spend += s.spend;
   }
   // открутка: был ли расход в последний день периода, за который есть бюджет
   const lastBudgetDay = [...spendDays].sort().pop() || null;
@@ -452,7 +457,7 @@ function render(){
   }).join("");
 
   const coverage = R.budgetDays < R.totalDays
-    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. Бюджет из Facebook есть с 21.09.2026; дни, когда выгрузка не сработала, не заполнены.</p>`
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. Бюджет из Facebook есть с 01.09.2026; дни, когда выгрузка не сработала, не заполнены.</p>`
     : "";
   const partialDays = Object.keys(R.partial).sort();
   const partialNote = partialDays.length
@@ -584,17 +589,37 @@ function drawDyn(R){
   const on = METRICS.filter(m => dynOn[m.k]);
   const W = Math.max(280, host.clientWidth || 600);
   const narrow = W < 620;
-  const pL = 16, pR = 16, H = narrow ? 300 : 380, top = 20, bot = 34;
+  // оси с цифрами: слева — первая включённая метрика, справа — вторая (как в Google Ads);
+  // у третьей и четвёртой оси нет, их цифры — в подсказке
+  const axL = on[0], axR = on[1];
+  const pL = axL ? 52 : 16, pR = axR ? 52 : 16, H = narrow ? 300 : 380, top = 34, bot = 34;
   const n = S.length;
   const X = (i) => n === 1 ? W / 2 : pL + i * (W - pL - pR) / (n - 1);
-  // у каждой линии своя шкала 0…макс., иначе штуки и доллары не уживутся на одном поле
-  const maxes = Object.fromEntries(on.map(m => [m.k, Math.max(...S.map(x => x[m.k]).filter(v => v != null), 0) * 1.08 || 1]));
+  // у каждой линии своя шкала 0…«круглый» максимум: делится на 4 ровные доли,
+  // поэтому подписи осей получаются круглыми (0, 30, 60, 90, 120)
+  const nice = (v) => {
+    if (!(v > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+    const k = [1, 1.2, 1.6, 2, 2.4, 3, 4, 5, 6, 8, 10].find(s => f <= s * 1.0001);
+    return k * p;
+  };
+  const maxes = Object.fromEntries(on.map(m => [m.k, nice(Math.max(...S.map(x => x[m.k]).filter(v => v != null), 0))]));
   const Y = (k, v) => top + (H - top - bot) * (1 - v / maxes[k]);
+  const tickTxt = (m, v) => m.k === "leads" || m.k === "sales"
+    ? int.format(Math.round(v))
+    : "$" + v.toLocaleString("ru-RU", {minimumFractionDigits: v < 10 ? 2 : 0, maximumFractionDigits: v < 10 ? 2 : 0});
 
   const grid = [0, .25, .5, .75, 1].map(f => {
     const y = top + (H - top - bot) * f;
-    return `<line x1="${pL}" x2="${W - pR}" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:1;${f < 1 ? "opacity:.55" : ""}"/>`;
+    const lab = (m, x, anchor) => m ? `<text x="${x}" y="${y + 4}" text-anchor="${anchor}" style="fill:var(--muted);font-size:11.5px">${tickTxt(m, maxes[m.k] * (1 - f))}</text>` : "";
+    return `<line x1="${pL}" x2="${W - pR}" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:1;${f < 1 ? "opacity:.55" : ""}"/>`
+      + lab(axL, pL - 8, "end") + lab(axR, W - pR + 8, "start");
   }).join("");
+  // подписи осей: название метрики с её цветом над каждой осью
+  const axTitle = (m, x, anchor) => m ? `<g>
+      <line x1="${anchor === "start" ? x : x - 14}" x2="${anchor === "start" ? x + 14 : x}" y1="14" y2="14" style="stroke:var(${m.c});stroke-width:3;stroke-linecap:round"/>
+      <text x="${anchor === "start" ? x + 20 : x - 20}" y="18" text-anchor="${anchor}" style="fill:var(--ink);font-size:12px;font-weight:600">${m.l}</text></g>` : "";
+  const axTitles = axTitle(axL, 16, "start") + axTitle(axR, W - 16, "end");
   const step = Math.max(1, Math.ceil(n / (narrow ? 5 : 10)));
   const axis = S.map((x, i) => (i % step === 0 || i === n - 1) && !(i !== n - 1 && n - 1 - i < step / 2)
     ? `<text x="${X(i).toFixed(1)}" y="${H - 12}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}"
@@ -611,11 +636,13 @@ function drawDyn(R){
   const hps = on.map(m => `<circle class="hp" data-k="${m.k}" r="5.5" cx="-10" cy="-10" style="fill:var(${m.c});stroke:var(--panel);stroke-width:2"/>`).join("");
 
   host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Лиды, продажи, цена лида и цена продажи по дням">
-      ${grid}${axis}
+      ${axTitles}${grid}${axis}
       <line class="xh" x1="-10" x2="-10" y1="${top}" y2="${H - bot}" style="stroke:var(--ink);stroke-width:1;opacity:0"/>
       ${lines}${hps}
     </svg>
-    <p class="scale-note">У каждой линии своя шкала: по высоте видно, как метрика менялась по дням, а точные цифры — в подсказке при наведении.</p>
+    <p class="scale-note">${on.length > 2
+      ? `Шкала слева — «${axL.l}», справа — «${axR.l}». У остальных линий шкала своя, их точные цифры — в подсказке при наведении.`
+      : on.length === 2 ? `Шкала слева — «${axL.l}», справа — «${axR.l}».` : ""}</p>
     <div class="tip" id="tip" hidden></div>`;
 
   // наведение: ближайший день, вертикальная линия, точки на линиях, подсказка со всеми метриками дня
