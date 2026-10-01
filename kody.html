@@ -238,7 +238,8 @@ async function init(){
     DAYS = parseCSV(await a.text()).slice(1)
       .filter(r => isDate(r[0])).map(r => ({d:r[0], code:r[1].trim(), leads:num(r[2]), sales:num(r[3])}));
     SPEND = b.ok ? parseCSV(await b.text()).slice(1)
-      .filter(r => isDate(r[0])).map(r => ({d:r[0], camp:r[1], code:r[2].trim(), theme:r[3].trim(), spend:num(r[4])})) : [];
+      .filter(r => isDate(r[0])).map(r => ({d:r[0], camp:r[1], code:r[2].trim(), theme:r[3].trim(), spend:num(r[4]),
+        fetched:(r[6] || "").trim()})) : [];
   }catch(e){
     document.getElementById("app").innerHTML =
       `<div class="state">Не получилось загрузить таблицу кодов (${e.message}). Проверьте интернет и обновите страницу.</div>`;
@@ -285,7 +286,12 @@ function compute(){
   const get = (c) => rows[c] || (rows[c] = {code:c, leads:0, sales:0, spend:0, lastSpend:null});
   for (const r of DAYS) if (inR(r.d)){ const x = get(r.code); x.leads += r.leads; x.sales += r.sales; }
   const spendDays = new Set();
-  for (const s of SPEND) if (inR(s.d) && s.code){ get(s.code).spend += s.spend; spendDays.add(s.d); }
+  // день, выгруженный в тот же день (он ещё шёл), — бюджет за него неполный
+  const partial = {};
+  for (const s of SPEND) if (inR(s.d) && s.code){
+    get(s.code).spend += s.spend; spendDays.add(s.d);
+    if (s.fetched && s.fetched.slice(0, 10) <= s.d) partial[s.d] = s.fetched.slice(11, 16);
+  }
   // открутка: был ли расход в последний день периода, за который есть бюджет
   const lastBudgetDay = [...spendDays].sort().pop() || null;
   if (lastBudgetDay){
@@ -301,7 +307,7 @@ function compute(){
     cps: x.spend && x.sales ? x.spend / x.sales : null,
     status: x.code === NOCODE || !lastBudgetDay ? null : !!x.lastSpend
   }));
-  return {from, to, noWe, list, budgetDays: spendDays.size, totalDays: total, lastBudgetDay};
+  return {from, to, noWe, list, budgetDays: spendDays.size, totalDays: total, lastBudgetDay, partial};
 }
 
 function agg(items){
@@ -387,7 +393,11 @@ function render(){
   }).join("");
 
   const coverage = R.budgetDays < R.totalDays
-    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. Выгрузка расхода из Facebook идёт с 23.09.2026 и не каждый день.</p>`
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. Бюджет из Facebook есть с 21.09.2026; дни, когда выгрузка не сработала, не заполнены.</p>`
+    : "";
+  const partialDays = Object.keys(R.partial).sort();
+  const partialNote = partialDays.length
+    ? `<p class="note">Бюджет неполный за ${partialDays.map(d => `${ru(d)} (выгружен в ${R.partial[d]}, день ещё шёл)`).join(", ")}. Ночная выгрузка заменит его полной суммой.</p>`
     : "";
 
   document.getElementById("app").innerHTML = `
@@ -406,7 +416,7 @@ function render(){
       <span>органика Instagram: <b>${org ? org.sales : 0}</b></span>
       <span>без кода: <b>${nc ? nc.sales : 0}</b></span>
     </div>
-    ${coverage}
+    ${coverage}${partialNote}
   </div>
 
   <section>
