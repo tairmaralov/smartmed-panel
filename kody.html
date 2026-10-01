@@ -154,9 +154,8 @@ tfoot tr + tr td{border-top:1px solid var(--line)}
 .mtile[aria-pressed="false"] .v, .mtile[aria-pressed="false"] .h{opacity:.45}
 .mtile[aria-pressed="false"] .sw{border-top-style:dotted}
 .plots{position:relative; padding:6px 0 4px; touch-action:pan-y}
-.plot{position:relative}
-.plot .pt{position:absolute; left:14px; top:4px; font-size:12px; color:var(--muted); pointer-events:none}
 .plots svg{display:block; width:100%}
+.scale-note{margin:0; padding:0 16px 10px; font-size:12px; color:var(--muted)}
 .tip{position:absolute; z-index:3; pointer-events:none; background:var(--ink); color:var(--bg);
   border-radius:8px; padding:8px 10px; font-size:12.5px; line-height:1.5; min-width:150px;
   box-shadow:0 4px 14px rgba(0,0,0,.18)}
@@ -221,8 +220,9 @@ tfoot tr + tr td{border-top:1px solid var(--line)}
 
   <p class="foot">
     Лиды считаются по дню обращения, продажи — по дню продажи из таблиц менеджеров.
-    Бюджет — расход кабинета SmartLab2 по кампаниям; код крео берётся из названия кампании,
-    бюджет кампаний «Подписка» отнесён к органике Instagram (код 340222).
+    Бюджет — расход кабинета SmartLab2 по кампаниям; код крео берётся из названия кампании.
+    Кампании «Подписка» — набор подписчиков, в бюджет не входят; у органики Instagram
+    (код 340222) бюджета нет, поэтому цены лида и продажи у неё не считаются.
     «Открутка» — был ли расход по кампании в последний день периода, за который есть бюджет.
     Источник: <a href="https://docs.google.com/spreadsheets/d/1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas/edit" target="_blank" rel="noopener">таблица кодов SmartLab</a>.
   </p>
@@ -353,7 +353,8 @@ function compute(){
     cpl: x.spend && x.leads ? x.spend / x.leads : null,
     conv: x.leads ? x.sales / x.leads : null,
     cps: x.spend && x.sales ? x.spend / x.sales : null,
-    status: x.code === NOCODE || !lastBudgetDay ? null : !!x.lastSpend
+    // у органики бюджета нет — «идёт/стоит» к ней неприменимо
+    status: x.code === NOCODE || x.code === ORGANIC || !lastBudgetDay ? null : !!x.lastSpend
   }));
   return {from, to, noWe, list, budgetDays: spendDays.size, totalDays: total, lastBudgetDay, partial, days};
 }
@@ -507,9 +508,10 @@ function render(){
 }
 
 /* ===== динамика по дням =====
-   Четыре метрики разного масштаба (штуки и доллары) — поэтому не одна ось на всех,
-   а узкие графики друг под другом: у каждого своя шкала, ось дат и линия наведения
-   общие. Плитки сверху включают/выключают графики и служат легендой. */
+   Один график, четыре линии — как в Google Ads (просьба пользователя 01.10.2026).
+   Метрики разного масштаба (штуки и доллары), поэтому у каждой линии СВОЯ шкала
+   от нуля до её максимума: по высоте сравнивается форма, а не величина; точные
+   цифры дня — в подсказке. Плитки сверху включают/выключают линии и служат легендой. */
 const THEME_ORDER = ["щитовидка", "анемия", "гастро", "биохимия", "органика Instagram"];
 const METRICS = [
   {k:"leads", l:"Лиды",         c:"--m-leads", f:(v) => int.format(v)},
@@ -565,65 +567,67 @@ function drawDyn(R){
   if (!S.length){ host.innerHTML = '<div class="state" style="margin:12px">В периоде нет дней.</div>'; return; }
   const on = METRICS.filter(m => dynOn[m.k]);
   const W = Math.max(280, host.clientWidth || 600);
-  const pL = 16, pR = 16, H = 92, top = 26, bot = 10, axisH = 22;
+  const narrow = W < 620;
+  const pL = 16, pR = 16, H = narrow ? 300 : 380, top = 20, bot = 34;
   const n = S.length;
   const X = (i) => n === 1 ? W / 2 : pL + i * (W - pL - pR) / (n - 1);
+  // у каждой линии своя шкала 0…макс., иначе штуки и доллары не уживутся на одном поле
+  const maxes = Object.fromEntries(on.map(m => [m.k, Math.max(...S.map(x => x[m.k]).filter(v => v != null), 0) * 1.08 || 1]));
+  const Y = (k, v) => top + (H - top - bot) * (1 - v / maxes[k]);
 
-  host.innerHTML = on.map((m, mi) => {
+  const grid = [0, .25, .5, .75, 1].map(f => {
+    const y = top + (H - top - bot) * f;
+    return `<line x1="${pL}" x2="${W - pR}" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:1;${f < 1 ? "opacity:.55" : ""}"/>`;
+  }).join("");
+  const step = Math.max(1, Math.ceil(n / (narrow ? 5 : 10)));
+  const axis = S.map((x, i) => (i % step === 0 || i === n - 1) && !(i !== n - 1 && n - 1 - i < step / 2)
+    ? `<text x="${X(i).toFixed(1)}" y="${H - 12}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}"
+         style="fill:var(--muted);font-size:11.5px">${x.d.slice(8)}.${x.d.slice(5,7)}</text>` : "").join("");
+  // порядок отрисовки: лиды поверх остальных
+  const lines = [...on].reverse().map(m => {
     const vals = S.map(x => x[m.k]);
-    const max = Math.max(...vals.filter(v => v != null), 0) * 1.12 || 1;
-    const h = H + (mi === on.length - 1 ? axisH : 0);
-    const Y = (v) => top + (H - top - bot) * (1 - v / max);
     let d = "", pen = false;
-    vals.forEach((v, i) => { if (v == null){ pen = false; return; } d += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); pen = true; });
+    vals.forEach((v, i) => { if (v == null){ pen = false; return; } d += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(m.k, v).toFixed(1); pen = true; });
     const dots = n <= 45 ? vals.map((v, i) => v == null ? "" :
-      `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.6" style="fill:var(${m.c})"/>`).join("") : "";
-    let axis = "";
-    if (mi === on.length - 1){
-      const step = Math.max(1, Math.ceil(n / 8));
-      axis = S.map((x, i) => (i % step === 0 || i === n - 1) && !(i !== n - 1 && n - 1 - i < step / 2)
-        ? `<text x="${X(i).toFixed(1)}" y="${H + 15}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}"
-             style="fill:var(--muted);font-size:11px">${x.d.slice(8)}.${x.d.slice(5,7)}</text>` : "").join("");
-    }
-    const lastV = [...vals].reverse().find(v => v != null);
-    return `<div class="plot" data-k="${m.k}">
-      <span class="pt">${m.l} · макс. ${m.f(max / 1.12)}</span>
-      <svg viewBox="0 0 ${W} ${h}" height="${h}" role="img" aria-label="${m.l} по дням">
-        <line x1="${pL}" x2="${W - pR}" y1="${H - bot}" y2="${H - bot}" style="stroke:var(--line)"/>
-        <path d="${d}" fill="none" style="stroke:var(${m.c});stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>
-        ${dots}
-        <line class="xh" x1="0" x2="0" y1="${top - 6}" y2="${H - bot}" style="stroke:var(--ink);stroke-width:1;opacity:0"/>
-        <circle class="hp" r="4.5" cx="-10" cy="-10" style="fill:var(${m.c});stroke:var(--panel);stroke-width:2"/>
-        ${axis}
-      </svg></div>`;
-  }).join("") + `<div class="tip" id="tip" hidden></div>`;
+      `<circle cx="${X(i).toFixed(1)}" cy="${Y(m.k, v).toFixed(1)}" r="3" style="fill:var(${m.c});stroke:var(--panel);stroke-width:1.5"/>`).join("") : "";
+    return `<path d="${d}" fill="none" style="stroke:var(${m.c});stroke-width:2.25;stroke-linejoin:round;stroke-linecap:round"/>${dots}`;
+  }).join("");
+  const hps = on.map(m => `<circle class="hp" data-k="${m.k}" r="5.5" cx="-10" cy="-10" style="fill:var(${m.c});stroke:var(--panel);stroke-width:2"/>`).join("");
 
-  // наведение: ближайший день, линия во всех графиках, подсказка со всеми метриками дня
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Лиды, продажи, цена лида и цена продажи по дням">
+      ${grid}${axis}
+      <line class="xh" x1="-10" x2="-10" y1="${top}" y2="${H - bot}" style="stroke:var(--ink);stroke-width:1;opacity:0"/>
+      ${lines}${hps}
+    </svg>
+    <p class="scale-note">У каждой линии своя шкала: по высоте видно, как метрика менялась по дням, а точные цифры — в подсказке при наведении.</p>
+    <div class="tip" id="tip" hidden></div>`;
+
+  // наведение: ближайший день, вертикальная линия, точки на линиях, подсказка со всеми метриками дня
   const tip = document.getElementById("tip");
-  const maxes = Object.fromEntries(on.map(m => [m.k, Math.max(...S.map(x => x[m.k]).filter(v => v != null), 0) * 1.12 || 1]));
   const move = (ev) => {
-    const rect = host.getBoundingClientRect();
+    const rect = host.querySelector("svg").getBoundingClientRect();
     const px = (ev.clientX - rect.left) * (W / rect.width);
     const i = Math.max(0, Math.min(n - 1, Math.round(n === 1 ? 0 : (px - pL) / ((W - pL - pR) / (n - 1)))));
     const x = S[i];
-    host.querySelectorAll(".plot").forEach(p => {
-      const k = p.dataset.k, v = x[k];
-      const xh = p.querySelector(".xh"), hp = p.querySelector(".hp");
-      xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.style.opacity = .35;
-      if (v == null){ hp.setAttribute("cx", -10); }
-      else { hp.setAttribute("cx", X(i)); hp.setAttribute("cy", top + (H - top - bot) * (1 - v / maxes[k])); }
+    const xh = host.querySelector(".xh");
+    xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.style.opacity = .35;
+    host.querySelectorAll(".hp").forEach(c => {
+      const v = x[c.dataset.k];
+      if (v == null) c.setAttribute("cx", -10);
+      else { c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(c.dataset.k, v)); }
     });
     tip.innerHTML = `<b>${WD[weekday(x.d)]}, ${ru(x.d)}</b>` + METRICS.map(m =>
       `<div class="r"><span><i style="--c:var(${m.c})"></i>${m.l}</span><span>${x[m.k] == null ? "—" : m.f(x[m.k])}</span></div>`).join("")
       + `<div class="w">бюджет ${x.spend ? usd(x.spend) : "—"}${R.partial[x.d] ? " · неполный" : ""}</div>`;
     tip.hidden = false;
-    const tx = ev.clientX - rect.left, tw = tip.offsetWidth;
-    tip.style.left = Math.max(4, Math.min(rect.width - tw - 4, tx + 14 > rect.width - tw ? tx - tw - 14 : tx + 14)) + "px";
-    tip.style.top = Math.max(4, ev.clientY - rect.top - tip.offsetHeight / 2) + "px";
+    const hr = host.getBoundingClientRect();
+    const tx = ev.clientX - hr.left, tw = tip.offsetWidth;
+    tip.style.left = Math.max(4, Math.min(hr.width - tw - 4, tx + 14 > hr.width - tw ? tx - tw - 14 : tx + 14)) + "px";
+    tip.style.top = Math.max(4, Math.min(H - tip.offsetHeight, ev.clientY - hr.top - tip.offsetHeight / 2)) + "px";
   };
   const leave = () => {
     tip.hidden = true;
-    host.querySelectorAll(".xh").forEach(l => l.style.opacity = 0);
+    host.querySelector(".xh").style.opacity = 0;
     host.querySelectorAll(".hp").forEach(c => c.setAttribute("cx", -10));
   };
   host.onpointermove = move; host.onpointerdown = move; host.onpointerleave = leave;
