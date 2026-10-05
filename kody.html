@@ -484,7 +484,8 @@ function render(){
   </div>
 
   <section>
-    <h2>Динамика по дням</h2>
+    <h2 id="dynTitle">Динамика по дням</h2>
+    <div class="chips" id="stepChips" role="group" aria-label="Шаг графика"></div>
     <div class="chips" id="dynChips" role="group" aria-label="Направление"></div>
     <div class="dyn">
       <div class="mtiles" id="mtiles"></div>
@@ -541,6 +542,26 @@ let dynTheme = load("dynTheme") || "all";
 // продажи и цену продажи включают нажатием на плитку
 let dynOn = load("dynOn2") || {leads:true, sales:false, cpl:true, cps:false};
 const WD = ["вс","пн","вт","ср","чт","пт","сб"];
+// шаг графика: по дням или по календарным неделям пн–вс (просьба пользователя 05.10.2026)
+let dynStep = load("dynStep") === "week" ? "week" : "day";
+
+// Дни → недели. Лиды, продажи и бюджет складываются, цены пересчитываются из сумм
+// (не среднее дневных цен). Крайние недели периода бывают неполными — это видно
+// по числу дней в подсказке.
+function weekly(S){
+  const out = [], idx = {};
+  for (const x of S){
+    const mon = addDays(x.d, -((weekday(x.d) + 6) % 7));
+    let w = idx[mon];
+    if (!w){ w = idx[mon] = {d:x.d, d2:x.d, mon, n:0, leads:0, sales:0, spend:0}; out.push(w); }
+    w.d2 = x.d; w.n++; w.leads += x.leads; w.sales += x.sales; w.spend += x.spend;
+  }
+  for (const w of out){
+    w.cpl = w.spend && w.leads ? w.spend / w.leads : null;
+    w.cps = w.spend && w.sales ? w.spend / w.sales : null;
+  }
+  return out;
+}
 
 function dynSeries(R){
   const match = dynTheme === "all" ? () => true : (code) => TAG[code] === dynTheme;
@@ -569,7 +590,18 @@ function drawDyn(R){
   chips.onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
     dynTheme = b.dataset.t; store("dynTheme", dynTheme); drawDyn(LAST_R); };
 
-  const S = dynSeries(R);
+  const week = dynStep === "week";
+  document.getElementById("dynTitle").textContent = week ? "Динамика по неделям" : "Динамика по дням";
+  const steps = document.getElementById("stepChips");
+  steps.innerHTML = `<span class="chips-l">Шаг:</span>` +
+    [["day", "по дням"], ["week", "по неделям"]].map(([k, l]) =>
+      `<button type="button" data-s="${k}" class="${dynStep === k ? "on" : ""}" aria-pressed="${dynStep === k}">${l}</button>`).join("");
+  steps.onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    dynStep = b.dataset.s; store("dynStep", dynStep); drawDyn(LAST_R); };
+
+  const S = week ? weekly(dynSeries(R)) : dynSeries(R);
+  // полная неделя: 7 дней, а с галкой «без выходных» — 5
+  const fullWeek = R.noWe ? 5 : 7;
   const tot = S.reduce((a, x) => ({leads:a.leads+x.leads, sales:a.sales+x.sales, spend:a.spend+x.spend}), {leads:0, sales:0, spend:0});
   const totV = {leads:tot.leads, sales:tot.sales,
     cpl: tot.spend && tot.leads ? tot.spend/tot.leads : null, cps: tot.spend && tot.sales ? tot.spend/tot.sales : null};
@@ -629,20 +661,24 @@ function drawDyn(R){
     const vals = S.map(x => x[m.k]);
     let d = "", pen = false;
     vals.forEach((v, i) => { if (v == null){ pen = false; return; } d += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(m.k, v).toFixed(1); pen = true; });
-    const dots = n <= 45 ? vals.map((v, i) => v == null ? "" :
-      `<circle cx="${X(i).toFixed(1)}" cy="${Y(m.k, v).toFixed(1)}" r="3" style="fill:var(${m.c});stroke:var(--panel);stroke-width:1.5"/>`).join("") : "";
+    // неполная неделя (край периода) — пустая точка: её «провал» не настоящий
+    const hollow = (i) => week && S[i].n < fullWeek;
+    const dots = n <= 45 ? vals.map((v, i) => v == null ? "" : hollow(i)
+      ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(m.k, v).toFixed(1)}" r="3.5" style="fill:var(--panel);stroke:var(${m.c});stroke-width:2"/>`
+      : `<circle cx="${X(i).toFixed(1)}" cy="${Y(m.k, v).toFixed(1)}" r="3" style="fill:var(${m.c});stroke:var(--panel);stroke-width:1.5"/>`).join("") : "";
     return `<path d="${d}" fill="none" style="stroke:var(${m.c});stroke-width:2.25;stroke-linejoin:round;stroke-linecap:round"/>${dots}`;
   }).join("");
   const hps = on.map(m => `<circle class="hp" data-k="${m.k}" r="5.5" cx="-10" cy="-10" style="fill:var(${m.c});stroke:var(--panel);stroke-width:2"/>`).join("");
 
-  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Лиды, продажи, цена лида и цена продажи по дням">
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Лиды, продажи, цена лида и цена продажи ${week ? "по неделям" : "по дням"}">
       ${axTitles}${grid}${axis}
       <line class="xh" x1="-10" x2="-10" y1="${top}" y2="${H - bot}" style="stroke:var(--ink);stroke-width:1;opacity:0"/>
       ${lines}${hps}
     </svg>
     <p class="scale-note">${on.length > 2
       ? `Шкала слева — «${axL.l}», справа — «${axR.l}». У остальных линий шкала своя, их точные цифры — в подсказке при наведении.`
-      : on.length === 2 ? `Шкала слева — «${axL.l}», справа — «${axR.l}».` : ""}</p>
+      : on.length === 2 ? `Шкала слева — «${axL.l}», справа — «${axR.l}».` : ""}${
+      week && S.some(x => x.n < fullWeek) ? " Пустая точка — неделя попала в период не целиком, сравнивать её с полными нельзя." : ""}</p>
     <div class="tip" id="tip" hidden></div>`;
 
   // наведение: ближайший день, вертикальная линия, точки на линиях, подсказка со всеми метриками дня
@@ -659,9 +695,14 @@ function drawDyn(R){
       if (v == null) c.setAttribute("cx", -10);
       else { c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(c.dataset.k, v)); }
     });
-    tip.innerHTML = `<b>${WD[weekday(x.d)]}, ${ru(x.d)}</b>` + METRICS.map(m =>
+    const head = week
+      ? `<b>${ru(x.d).slice(0, 5)} — ${ru(x.d2)}</b>${x.n < fullWeek ? `<div class="w">неполная неделя: ${x.n} из ${fullWeek} дн.</div>` : ""}`
+      : `<b>${WD[weekday(x.d)]}, ${ru(x.d)}</b>`;
+    // неделя с неполным днём бюджета (день ещё шёл при выгрузке) — тоже неполная по бюджету
+    const part = week ? R.days.some(d => d >= x.d && d <= x.d2 && R.partial[d]) : !!R.partial[x.d];
+    tip.innerHTML = head + METRICS.map(m =>
       `<div class="r"><span><i style="--c:var(${m.c})"></i>${m.l}</span><span>${x[m.k] == null ? "—" : m.f(x[m.k])}</span></div>`).join("")
-      + `<div class="w">бюджет ${x.spend ? usd(x.spend) : "—"}${R.partial[x.d] ? " · неполный" : ""}</div>`;
+      + `<div class="w">бюджет ${x.spend ? usd(x.spend) : "—"}${part ? " · неполный" : ""}</div>`;
     tip.hidden = false;
     const hr = host.getBoundingClientRect();
     const tx = ev.clientX - hr.left, tw = tip.offsetWidth;
