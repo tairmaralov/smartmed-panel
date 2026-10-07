@@ -215,6 +215,15 @@ table.ct .sw{display:inline-block; width:14px; height:0; border-top:3px solid va
   vertical-align:middle; margin-right:8px}
 @media (max-width:860px){ .ctiles{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:520px){ .ctiles{grid-template-columns:repeat(2,minmax(0,1fr))} .views button{padding:6px 10px; font-size:13.5px} }
+/* на телефоне таблица каналов помещается в ширину без прокрутки: при прокрутке вбок
+   закреплённая первая колонка наезжала на шапку («Продаж» → «одаж», правка 07.10.2026) */
+@media (max-width:640px){
+  table.ct{min-width:0; font-size:13px}
+  table.ct th, table.ct td{padding:7px 5px; white-space:normal}
+  table.ct th:first-child, table.ct td:first-child{position:static}
+  table.ct .sw{width:10px; margin-right:5px}
+  table.ct .dev{white-space:normal}
+}
 
 @media (max-width:860px){
   .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -265,16 +274,20 @@ table.ct .sw{display:inline-block; width:14px; height:0; border-top:3px solid va
   <div id="app"></div>
 
   <p class="foot" id="footKanaly" hidden>
-    Продажи — из таблиц менеджеров по дню продажи, как в ежедневном отчёте по источникам
-    SmartLab (он обновляет данные 6 раз в день). Одна сделка за день — одна продажа.
+    Продажи — из таблиц менеджеров по дню продажи, как в ежедневных отчётах по источникам
+    SmartMed и SmartLab (они обновляют данные 6 раз в день): цифры те же, что в сводках
+    в Telegram. У SmartMed каждая строка таблицы менеджера — продажа (семья на одном номере —
+    несколько), у SmartLab одна сделка за день — одна продажа.
     Норма дня — среднее за 4 прошлых таких же дня недели (понедельник сравнивается
     с понедельниками: выходные всегда проседают); норма периода — сумма норм его дней.
     Сегодняшний день ещё идёт и в сравнение с нормой не входит.
     Зелёная метка — не ниже нормы больше чем на 10%, жёлтая — ниже на 10–25%,
     красная — ниже больше чем на 25%; при норме меньше 8 продаж метка серая —
     слишком мало для вывода.
-    «Прочие» — TikTok, рассылка/врачи, ВНД и продажи без сделки в Битриксе.
-    Продажи таргета здесь и на вкладке кодов могут немного отличаться: там они
+    «Прочее» у SmartMed и «Остальное» у SmartLab — источники, не попавшие ни в один канал;
+    «Другие» у SmartMed — TikTok, Аллерголаб/МО и продажи без сделки в Битриксе, «Прочие»
+    у SmartLab — TikTok, рассылка/врачи, ВНД и без сделки.
+    Продажи таргета SmartLab здесь и на вкладке кодов могут немного отличаться: там они
     считаются по перепискам с кодом, здесь — по таблицам менеджеров.
   </p>
   <p class="foot" id="footKody">
@@ -366,12 +379,14 @@ async function init(){
 }
 
 /* Раздел страницы: «kody» — таргет по кодам, «kanaly» — продажи по каналам.
-   Адрес с #kanaly открывает сразу каналы — такую ссылку можно переслать. */
+   Адрес #kanaly-sm / #kanaly-sl открывает сразу каналы нужного направления —
+   такую ссылку можно переслать. */
 function setView(v, first){
   VIEW = v; store("view", v);
-  if (!first || location.hash){ try{ history.replaceState(null, "", "#" + v); }catch(e){} }
+  const hash = v === "kanaly" ? "#kanaly-" + CH_DIR : "#kody";
+  if (!first || location.hash){ try{ history.replaceState(null, "", hash); }catch(e){} }
   document.querySelectorAll("#views button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
-  const title = v === "kanaly" ? "Продажи SmartLab по каналам" : "Коды креативов SmartLab";
+  const title = v === "kanaly" ? `Продажи ${CH_DIRS[CH_DIR].name} по каналам` : "Коды креативов SmartLab";
   document.getElementById("h1").textContent = title; document.title = title;
   document.getElementById("footKody").hidden = v !== "kody";
   document.getElementById("footKanaly").hidden = v !== "kanaly";
@@ -799,46 +814,61 @@ function drawDyn(R){
 }
 
 /* ===== раздел «Продажи по каналам» (просьба пользователя 07.10.2026) =====
-   Данные — лист «Каналы» таблицы кодов. Его пишет отчёт по источникам SmartLab при
-   каждом из 6 прогонов: только даты и числа, без ФИО и телефонов приёмного дока.
-   Норма дня — среднее 4 прошлых таких же дней недели, та же, что в ночной сводке
-   в Telegram (report_smartlab_istochnik.norm_block). Шкала у графика одна на все
-   линии: все они — штуки продаж. */
-const CHS = [
-  {k:"total",   h:"Всего",     c:"--c-total"},
-  {k:"target",  h:"Таргет",    c:"--c-target"},
-  {k:"context", h:"Контекст",  c:"--c-context"},
-  {k:"gis",     h:"2ГИС",      c:"--c-gis"},
-  {k:"other",   h:"Остальное", c:"--c-other"},
-  {k:"misc",    h:"Прочие",    c:"--c-misc"},
+   Два направления — SmartMed (по умолчанию: ради него раздел и просили) и SmartLab.
+   Данные — листы «Каналы SmartMed» и «Каналы» таблицы кодов. Их пишут отчёты по
+   источникам при каждом из 6 прогонов: только даты и числа, без ФИО и телефонов
+   приёмного дока. Норма дня — среднее 4 прошлых таких же дней недели, та же, что
+   в ночной сводке в Telegram (deploy/sales_norm.py). Шкала у графика одна на все
+   линии: все они — штуки продаж. Подписи каналов — как в сводке своего направления. */
+const CH_DIRS = {
+  sm: {name:"SmartMed", tab:"Каналы SmartMed", report:"SmartMed",
+       labels:{total:"Всего", target:"Таргет", context:"Контекст", gis:"2ГИС", other:"Прочее", misc:"Другие"}},
+  sl: {name:"SmartLab", tab:"Каналы", report:"SmartLab",
+       labels:{total:"Всего", target:"Таргет", context:"Контекст", gis:"2ГИС", other:"Остальное", misc:"Прочие"}},
+};
+const CH_BASE = [
+  {k:"total", c:"--c-total"}, {k:"target", c:"--c-target"}, {k:"context", c:"--c-context"},
+  {k:"gis", c:"--c-gis"}, {k:"other", c:"--c-other"}, {k:"misc", c:"--c-misc"},
 ];
 const SMALL_NORM = 8;   // при норме меньше — цвет не ставим: шум, а не вывод
-let CH = {}, CH_UPD = "", MAXC = "", MINC = "", CH_ERR = "";
-let VIEW = location.hash === "#kanaly" ? "kanaly" : location.hash === "#kody" ? "kody"
+const CH_DATA = {};     // по направлению: {CH, UPD, MAX, MIN, ERR}
+let CHS = [], CH = {}, CH_UPD = "", MAXC = "", MINC = "", CH_ERR = "";
+const H0 = location.hash;
+let VIEW = H0.startsWith("#kanaly") ? "kanaly" : H0 === "#kody" ? "kody"
   : (load("view") === "kanaly" ? "kanaly" : "kody");
+let CH_DIR = H0 === "#kanaly-sl" ? "sl" : H0 === "#kanaly-sm" ? "sm" : (load("chDir") === "sl" ? "sl" : "sm");
 let chOn = load("chOn") || {total:true, target:true, context:true, gis:false, other:true, misc:false};
 let chStep = load("chStep") === "week" ? "week" : "day";
 let LAST_CH = null;
 
-async function loadChannels(){
+async function loadDir(key){
+  const dir = CH_DIRS[key], x = CH_DATA[key] = {CH:{}, UPD:"", MAX:"", MIN:"", ERR:""};
   try{
-    const r = await fetch(csvUrl("Каналы"));
-    if (!r.ok) throw new Error("лист «Каналы» не открылся");
+    const r = await fetch(csvUrl(dir.tab));
+    if (!r.ok) throw new Error(`лист «${dir.tab}» не открылся`);
     const rows = parseCSV(await r.text());
     const hdr = (rows[0] || []).map(s => s.trim());
-    const ix = Object.fromEntries(CHS.map(c => [c.k, hdr.indexOf(c.h)]));
+    const ix = Object.fromEntries(CH_BASE.map(c => [c.k, hdr.indexOf(dir.labels[c.k])]));
     const iu = hdr.indexOf("Обновлено");
     // несуществующий лист gviz молча подменяет первым — проверяем шапку
-    if (ix.total < 0 || ix.target < 0) throw new Error("лист «Каналы» не найден");
-    for (const x of rows.slice(1)){
-      if (!isDate(x[0])) continue;
-      CH[x[0]] = Object.fromEntries(CHS.map(c => [c.k, ix[c.k] < 0 ? 0 : num(x[ix[c.k]])]));
-      const u = iu >= 0 ? (x[iu] || "").trim() : "";
-      if (u > CH_UPD) CH_UPD = u;
+    if (ix.total < 0 || ix.target < 0 || ix.other < 0) throw new Error(`лист «${dir.tab}» не найден`);
+    for (const row of rows.slice(1)){
+      if (!isDate(row[0])) continue;
+      x.CH[row[0]] = Object.fromEntries(CH_BASE.map(c => [c.k, ix[c.k] < 0 ? 0 : num(row[ix[c.k]])]));
+      const u = iu >= 0 ? (row[iu] || "").trim() : "";
+      if (u > x.UPD) x.UPD = u;
     }
-    const ds = Object.keys(CH).sort(); MINC = ds[0] || ""; MAXC = ds[ds.length - 1] || "";
-    if (!MAXC) throw new Error("в листе «Каналы» нет дней");
-  }catch(e){ CH_ERR = e.message; }
+    const ds = Object.keys(x.CH).sort(); x.MIN = ds[0] || ""; x.MAX = ds[ds.length - 1] || "";
+    if (!x.MAX) throw new Error(`в листе «${dir.tab}» нет дней`);
+  }catch(e){ x.ERR = e.message; }
+}
+async function loadChannels(){ await Promise.all(Object.keys(CH_DIRS).map(loadDir)); useDir(CH_DIR); }
+// переключение направления: все функции раздела читают эти общие переменные
+function useDir(key){
+  CH_DIR = key; store("chDir", key);
+  const x = CH_DATA[key] || {CH:{}, UPD:"", MAX:"", MIN:"", ERR:"нет данных"};
+  CH = x.CH; CH_UPD = x.UPD; MAXC = x.MAX; MINC = x.MIN; CH_ERR = x.ERR;
+  CHS = CH_BASE.map(c => ({...c, h: CH_DIRS[key].labels[c.k]}));
 }
 
 function chNorm(d, k){
@@ -883,8 +913,14 @@ const n1 = (v) => v == null ? "—" : v.toLocaleString("ru-RU", {maximumFraction
 
 function renderCh(){
   const app = document.getElementById("app");
+  const dirChips = `<div class="chips" id="chDir" role="group" aria-label="Направление"><span class="chips-l">Направление:</span>${
+    Object.entries(CH_DIRS).map(([k, d]) => `<button type="button" data-d="${k}" class="${CH_DIR === k ? "on" : ""}" aria-pressed="${CH_DIR === k}">${d.name}</button>`).join("")}</div>`;
+  const bindDir = () => { document.getElementById("chDir").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b || b.dataset.d === CH_DIR) return;
+    useDir(b.dataset.d); setView("kanaly"); }; };
   if (CH_ERR){
-    app.innerHTML = `<div class="state">Не получилось загрузить продажи по каналам (${CH_ERR}). Лист заполняет отчёт по источникам SmartLab — если ошибка держится, его прогон не прошёл.</div>`;
+    app.innerHTML = `<div style="margin-top:18px">${dirChips}</div><div class="state">Не получилось загрузить продажи по каналам ${CH_DIRS[CH_DIR].name} (${CH_ERR}). Лист заполняет отчёт по источникам ${CH_DIRS[CH_DIR].report} — если ошибка держится, его прогон не прошёл.</div>`;
+    bindDir();
     return;
   }
   const R = chCompute();
@@ -905,7 +941,8 @@ function renderCh(){
 
   app.innerHTML = `
   <section style="margin-top:18px">
-    <h2 id="chTitle">Продажи: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
+    ${dirChips}
+    <h2 id="chTitle">Продажи ${CH_DIRS[CH_DIR].name}: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
     <div class="chips" id="chStep" role="group" aria-label="Шаг графика"></div>
     <div class="dyn">
       <div class="ctiles" id="ctiles"></div>
@@ -924,6 +961,7 @@ function renderCh(){
     </table></div>
     <p class="dim" style="font-size:12.5px;margin:8px 2px 0">«Факт / норма» — только за закрытые дни, у которых есть норма (4 прошлых таких же дня недели), поэтому факт здесь может быть меньше, чем в колонке «Продаж».</p>
   </section>`;
+  bindDir();
 
   const tiles = document.getElementById("ctiles");
   tiles.innerHTML = CHS.map(c => `<button type="button" class="mtile" data-k="${c.k}" aria-pressed="${!!chOn[c.k]}" style="--c:var(${c.c})"
