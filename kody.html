@@ -292,24 +292,36 @@ table.ct .sw{display:inline-block; width:14px; height:0; border-top:3px solid va
   </p>
   <p class="foot" id="footKody">
     Лиды считаются по дню обращения, продажи — по дню продажи из таблиц менеджеров.
-    Бюджет — расход кабинета SmartLab2 по кампаниям; код крео берётся из названия кампании.
-    Кампании «Подписка» — набор подписчиков, в бюджет не входят; у органики Instagram
-    (код 340222) бюджета нет, поэтому цены лида и продажи у неё не считаются.
-    «Открутка» — был ли расход по кампании в последний день периода, за который есть бюджет.
-    Источник: <a href="https://docs.google.com/spreadsheets/d/1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas/edit" target="_blank" rel="noopener">таблица кодов SmartLab</a>.
+    <span id="footKodyText">Бюджет — расход кабинета SmartLab2 по кампаниям; код крео берётся из названия кампании.</span>
+    Кампании «Подписка» — набор подписчиков, в бюджет не входят.
+    «Открутка» — был ли расход по коду в последний день периода, за который есть бюджет.
+    Источник: <a id="footKodySrc" href="https://docs.google.com/spreadsheets/d/1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas/edit" target="_blank" rel="noopener">таблица кодов SmartLab</a>.
   </p>
 </div>
 
 <script>
 const SHEET = "1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas";
-const ORGANIC = "340222";
+/* Направления раздела «Таргет по кодам». SmartMed добавлен 19.10.2026 (просьба
+   пользователя): его таблица кодов устроена так же, а лист «Расход» в ней — расход
+   кампаний SmartMed и SmartMed2 из Envidicy (hierarchy-daily); код — первое число
+   в начале названия кампании («[008] 010 дубль» → 08). Окно from/to — дни, за которые
+   этот расход собран: лиды и продажи вне окна не показываются, иначе цены считались
+   бы по дням без бюджета. */
+const KODY_DIRS = {
+  sl: {name:"SmartLab", sheet:SHEET, organic:"340222", cabinet:"SmartLab2",
+       spendHow:"код крео берётся из названия кампании"},
+  sm: {name:"SmartMed", sheet:"11kmLkM-XkCeN7wPWnJB7uguCChL_7qvFT4RZUJVxxFI", organic:"780808",
+       cabinet:"SmartMed и SmartMed2", from:"2026-10-13", to:"2026-10-18",
+       spendHow:"расход по кампаниям — из Envidicy, код крео — первое число в начале названия кампании («[008] 010 дубль» → 08); у каждой кампании одно объявление, так что это и есть расход креатива. Кампания без числа в начале («d021 [перезапуск]») в бюджет кодов не входит"},
+};
+let ORGANIC = "340222";
 const NOCODE = "без кода";
 const THEMES = {
   "щитовидка": "--t-thyroid", "анемия": "--t-anemia", "гастро": "--t-gastro",
   "биохимия": "--t-biochem", "органика Instagram": "--t-organic"
 };
 
-const csvUrl = (tab) => `https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+const csvUrl = (tab, sheet = SHEET) => `https://docs.google.com/spreadsheets/d/${sheet}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
 
 function parseCSV(text){
   const rows = []; let row = [], cell = "", q = false;
@@ -346,31 +358,51 @@ function weekday(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y
 function ru(s){ const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; }
 
 let CODES_ERR = "";
-async function init(){
-  // лист «Каналы» грузится параллельно и не зависит от листов кодов
-  const chP = loadChannels();
+const KD = {};          // по направлению: {DAYS, SPEND, TAG, MAXD, MAXS, ERR}
+let KODY_DIR = location.hash === "#kody-sm" ? "sm" : location.hash === "#kody" ? "sl"
+  : (load("kodyDir") === "sm" ? "sm" : "sl");
+
+async function loadKody(key){
+  const dir = KODY_DIRS[key], x = KD[key] = {DAYS:[], SPEND:[], TAG:{}, MAXD:"", MAXS:"", ERR:""};
+  const inWin = (d) => (!dir.from || d >= dir.from) && (!dir.to || d <= dir.to);
   try{
-    const [a, b] = await Promise.all([fetch(csvUrl("По дням")), fetch(csvUrl("Расход"))]);
+    const [a, b] = await Promise.all([fetch(csvUrl("По дням", dir.sheet)), fetch(csvUrl("Расход", dir.sheet))]);
     if (!a.ok) throw new Error("лист «По дням» не открылся");
-    DAYS = parseCSV(await a.text()).slice(1)
-      .filter(r => isDate(r[0])).map(r => ({d:r[0], code:r[1].trim(), leads:num(r[2]), sales:num(r[3])}));
-    SPEND = b.ok ? parseCSV(await b.text()).slice(1)
-      .filter(r => isDate(r[0])).map(r => ({d:r[0], camp:r[1], code:r[2].trim(), theme:r[3].trim(), spend:num(r[4]),
+    x.DAYS = parseCSV(await a.text()).slice(1)
+      .filter(r => isDate(r[0]) && inWin(r[0])).map(r => ({d:r[0], code:r[1].trim(), leads:num(r[2]), sales:num(r[3])}));
+    // несуществующий лист gviz молча подменяет первым — берём «Расход», только если шапка его
+    const rs = b.ok ? parseCSV(await b.text()) : [];
+    x.SPEND = rs.length && /Расход/.test((rs[0] || []).join(",")) ? rs.slice(1)
+      .filter(r => isDate(r[0]) && inWin(r[0])).map(r => ({d:r[0], camp:r[1], code:r[2].trim(), theme:r[3].trim(), spend:num(r[4]),
         fetched:(r[6] || "").trim()})) : [];
   }catch(e){
-    CODES_ERR = e.message;
+    x.ERR = e.message;
   }
-  await chP;
   // Тема кода — по кампании, на которую ушло больше денег: коды переиспользуют
   // (57 на 21.09 был и «врач назначил», и «гаст»), а лиды по коду не разделить.
   const bySpend = {};
-  for (const s of SPEND) if (s.code && s.theme){
+  for (const s of x.SPEND) if (s.code && s.theme){
     const k = s.code; (bySpend[k] = bySpend[k] || {})[s.theme] = (bySpend[k][s.theme] || 0) + s.spend;
   }
-  for (const [code, t] of Object.entries(bySpend)) TAG[code] = Object.entries(t).sort((a, b) => b[1] - a[1])[0][0];
-  TAG[ORGANIC] = "органика Instagram";
-  MAXD = DAYS.reduce((m, r) => r.d > m ? r.d : m, "");
-  MAXS = SPEND.reduce((m, r) => r.d > m ? r.d : m, "");
+  for (const [code, t] of Object.entries(bySpend)) x.TAG[code] = Object.entries(t).sort((a, b) => b[1] - a[1])[0][0];
+  x.TAG[dir.organic] = "органика Instagram";
+  x.MAXD = x.DAYS.reduce((m, r) => r.d > m ? r.d : m, "");
+  x.MAXS = x.SPEND.reduce((m, r) => r.d > m ? r.d : m, "");
+}
+// переключение направления: все функции раздела читают эти общие переменные
+function useKody(key){
+  KODY_DIR = key; store("kodyDir", key);
+  const x = KD[key];
+  DAYS = x.DAYS; SPEND = x.SPEND; TAG = x.TAG; MAXD = x.MAXD; MAXS = x.MAXS; CODES_ERR = x.ERR;
+  ORGANIC = KODY_DIRS[key].organic;
+}
+
+async function init(){
+  // лист «Каналы» грузится параллельно и не зависит от листов кодов
+  const chP = loadChannels();
+  await Promise.all(Object.keys(KODY_DIRS).map(loadKody));
+  useKody(KODY_DIR);
+  await chP;
 
   document.getElementById("noweekend").checked = !!load("noweekend");
   const saved = load("range");
@@ -383,12 +415,19 @@ async function init(){
    такую ссылку можно переслать. */
 function setView(v, first){
   VIEW = v; store("view", v);
-  const hash = v === "kanaly" ? "#kanaly-" + CH_DIR : "#kody";
+  const hash = v === "kanaly" ? "#kanaly-" + CH_DIR : KODY_DIR === "sm" ? "#kody-sm" : "#kody";
   if (!first || location.hash){ try{ history.replaceState(null, "", hash); }catch(e){} }
   document.querySelectorAll("#views button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
-  const title = v === "kanaly" ? `Продажи ${CH_DIRS[CH_DIR].name} по каналам` : "Коды креативов SmartLab";
+  const KDIR = KODY_DIRS[KODY_DIR];
+  const title = v === "kanaly" ? `Продажи ${CH_DIRS[CH_DIR].name} по каналам` : `Коды креативов ${KDIR.name}`;
   document.getElementById("h1").textContent = title; document.title = title;
   document.getElementById("footKody").hidden = v !== "kody";
+  document.getElementById("footKodyText").innerHTML =
+    `Бюджет — расход кабинет${KODY_DIR === "sm" ? "ов" : "а"} ${KDIR.cabinet}; ${KDIR.spendHow}.`
+    + (KDIR.from ? ` Данные SmartMed показаны за ${ru(KDIR.from)} — ${ru(KDIR.to)}: за эти дни собран расход.` : "")
+    + ` У органики Instagram (код ${KDIR.organic}) бюджета нет, поэтому цены лида и продажи у неё не считаются.`;
+  const src = document.getElementById("footKodySrc");
+  src.href = `https://docs.google.com/spreadsheets/d/${KDIR.sheet}/edit`; src.textContent = `таблица кодов ${KDIR.name}`;
   document.getElementById("footKanaly").hidden = v !== "kanaly";
   const fr = document.getElementById("fresh");
   if (v === "kanaly") fr.textContent = CH_ERR || !MAXC ? "" : `продажи по ${ru(MAXC)}`
@@ -481,11 +520,22 @@ const COLS = [
   ["cpl","Цена лида"],["sales","Продаж"],["conv","Конверсия"],["cps","Цена продажи"]
 ];
 
+function kodyDirChips(){
+  return `<div class="chips" id="kodyDir" role="group" aria-label="Направление" style="margin-top:18px"><span class="chips-l">Направление:</span>${
+    Object.entries(KODY_DIRS).map(([k, d]) => `<button type="button" data-d="${k}" class="${KODY_DIR === k ? "on" : ""}" aria-pressed="${KODY_DIR === k}">${d.name}</button>`).join("")}</div>`;
+}
+function bindKodyDir(){
+  document.getElementById("kodyDir").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b || b.dataset.d === KODY_DIR) return;
+    useKody(b.dataset.d); setView("kody"); };
+}
+
 function render(){
   if (VIEW === "kanaly") return renderCh();
   if (CODES_ERR){
-    document.getElementById("app").innerHTML =
-      `<div class="state">Не получилось загрузить таблицу кодов (${CODES_ERR}). Проверьте интернет и обновите страницу.</div>`;
+    document.getElementById("app").innerHTML = kodyDirChips() +
+      `<div class="state">Не получилось загрузить таблицу кодов ${KODY_DIRS[KODY_DIR].name} (${CODES_ERR}). Проверьте интернет и обновите страницу.</div>`;
+    bindKodyDir();
     return;
   }
   renderKody();
@@ -512,7 +562,7 @@ function renderKody(){
   const cell = (x, k) => {
     const v = x[k];
     switch (k){
-      case "code": return `<td class="code">${x.code === ORGANIC ? "340222" : x.code}</td>`;
+      case "code": return `<td class="code">${x.code}</td>`;
       case "theme": return `<td>${x.code === NOCODE ? '<span class="dim">клиент не прислал код</span>' : chip(x.theme)}</td>`;
       case "status": return `<td>${v == null ? '<span class="dim">—</span>' : v ? '<span class="pill on">идёт</span>' : '<span class="pill off">стоит</span>'}</td>`;
       case "spend": return `<td>${x.spend ? usd(x.spend) : '<span class="dim">—</span>'}</td>`;
@@ -553,16 +603,16 @@ function renderKody(){
   }).join("");
 
   const coverage = R.budgetDays < R.totalDays
-    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. Бюджет из Facebook есть с 01.09.2026; дни, когда выгрузка не сработала, не заполнены.</p>`
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Бюджет из Facebook есть с 01.09.2026; дни, когда выгрузка не сработала, не заполнены."}</p>`
     : "";
   const partialDays = Object.keys(R.partial).sort();
   const partialNote = partialDays.length
     ? `<p class="note">Бюджет неполный за ${partialDays.map(d => `${ru(d)} (выгружен в ${R.partial[d]}, день ещё шёл)`).join(", ")}. Ночная выгрузка заменит его полной суммой.</p>`
     : "";
 
-  document.getElementById("app").innerHTML = `
+  document.getElementById("app").innerHTML = `${kodyDirChips()}
   <div class="summary">
-    <h2>Весь таргет: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
+    <h2>Весь таргет ${KODY_DIRS[KODY_DIR].name}: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
     <div class="tiles">
       <div class="tile"><div class="v">${T.spend ? usd(T.spend) : "—"}</div><div class="l">бюджет</div></div>
       <div class="tile"><div class="v">${int.format(T.leads)}</div><div class="l">лидов</div></div>
@@ -607,6 +657,7 @@ function renderKody(){
   </section>`;
 
   LAST_R = R;
+  bindKodyDir();
   drawDyn(R);
 
   document.querySelectorAll("thead th").forEach(th => {
@@ -834,7 +885,7 @@ const SMALL_NORM = 8;   // при норме меньше — цвет не ст
 const CH_DATA = {};     // по направлению: {CH, UPD, MAX, MIN, ERR}
 let CHS = [], CH = {}, CH_UPD = "", MAXC = "", MINC = "", CH_ERR = "";
 const H0 = location.hash;
-let VIEW = H0.startsWith("#kanaly") ? "kanaly" : H0 === "#kody" ? "kody"
+let VIEW = H0.startsWith("#kanaly") ? "kanaly" : H0.startsWith("#kody") ? "kody"
   : (load("view") === "kanaly" ? "kanaly" : "kody");
 let CH_DIR = H0 === "#kanaly-sl" ? "sl" : H0 === "#kanaly-sm" ? "sm" : (load("chDir") === "sl" ? "sl" : "sm");
 let chOn = load("chOn") || {total:true, target:true, context:true, gis:false, other:true, misc:false};
