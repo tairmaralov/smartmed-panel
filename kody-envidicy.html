@@ -607,7 +607,7 @@ function renderKody(){
     : "";
   const partialDays = Object.keys(R.partial).sort();
   const partialNote = partialDays.length
-    ? `<p class="note">Бюджет неполный за ${partialDays.map(d => `${ru(d)} (выгружен в ${R.partial[d]}, день ещё шёл)`).join(", ")}. Ночная выгрузка заменит его полной суммой.</p>`
+    ? `<p class="note">Бюджет неполный за ${partialDays.map(d => `${ru(d)} (выгружен в ${R.partial[d]}, день ещё шёл)`).join(", ")}. Расход обновляется каждый час 08–23 и в 00, прошлые дни Envidicy дописывает сам.</p>`
     : "";
 
   document.getElementById("app").innerHTML = `${kodyDirChips()}
