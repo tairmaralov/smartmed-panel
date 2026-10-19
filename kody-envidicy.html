@@ -604,7 +604,7 @@ function renderKody(){
   }).join("");
 
   const coverage = R.budgetDays < R.totalDays
-    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed по объявлениям собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Бюджет из Facebook есть с 01.09.2026; дни, когда выгрузка не сработала, не заполнены."}</p>`
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed по объявлениям собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Расход по кампаниям Envidicy отдаёт с 12.09.2026: за 01–11.09 весь расход кабинета у него «Кампания не определена», по кодам его не разложить."}</p>`
     : "";
   const partialDays = Object.keys(R.partial).sort();
   const partialNote = partialDays.length
