@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Дашборд по кодам (Envidicy)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Дашборд кодов креативов SmartLab. Данные читаются при каждом открытии прямо
+   из Google-таблицы кодов (листы «По дням» и «Расход»); таблицу 6 раз в день
+   обновляет сервер, расход — выгрузка Meta (deploy/fetch_meta_daily.py). */
+:root{
+  color-scheme:light;
+  --bg:#F3F6F8; --panel:#FFFFFF; --panel2:#EBF0F4; --ink:#16212B; --muted:#5E6B78;
+  --line:#D9E0E6; --accent:#1F5F8B; --accent-ink:#FFFFFF;
+  --good:#2E7D5B; --warn:#A8701A; --bad:#B3432F;
+  --good-bg:#E4F2EA; --warn-bg:#F7EEDC; --bad-bg:#F6E3DF;
+  /* цвета крышек вакуумных пробирок — тема анализа */
+  --t-thyroid:#C9A227; --t-anemia:#8E7CC3; --t-gastro:#3F9A6B;
+  --t-biochem:#C2453A; --t-organic:#4A90C2; --t-other:#9AA4AE;
+  /* линии динамики: палитра проверена валидатором dataviz (светлая и тёмная) */
+  --m-leads:#2E6DB4; --m-sales:#A8326E; --m-cpl:#C9930E; --m-cps:#1F8A70;
+  /* каналы (вкладка «Продажи по каналам»): категориальная палитра dataviz, проверена
+     валидатором на #FFFFFF и #172029; «Всего» — цветом текста, он не канал */
+  --c-total:var(--ink); --c-target:#2a78d6; --c-context:#eb6834; --c-gis:#1baf7a;
+  --c-other:#eda100; --c-misc:#e87ba4;
+  --shadow:0 1px 2px rgba(22,33,43,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F161C; --panel:#172029; --panel2:#1D2833; --ink:#E6ECF1; --muted:#93A1AE;
+    --line:#2A3743; --accent:#6FA8D6; --accent-ink:#0F161C;
+    --good:#5DBB8C; --warn:#E0A64A; --bad:#E3796A;
+    --good-bg:#16302A; --warn-bg:#33291A; --bad-bg:#3A221F;
+    --m-leads:#5B8FD0; --m-sales:#C25C8C; --m-cpl:#B98A1C; --m-cps:#2C9E7E;
+    --c-target:#3987e5; --c-context:#d95926; --c-gis:#199e70; --c-other:#c98500; --c-misc:#d55181;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F161C; --panel:#172029; --panel2:#1D2833; --ink:#E6ECF1; --muted:#93A1AE;
+  --line:#2A3743; --accent:#6FA8D6; --accent-ink:#0F161C;
+  --good:#5DBB8C; --warn:#E0A64A; --bad:#E3796A;
+  --good-bg:#16302A; --warn-bg:#33291A; --bad-bg:#3A221F;
+  --m-leads:#5B8FD0; --m-sales:#C25C8C; --m-cpl:#B98A1C; --m-cps:#2C9E7E;
+  --c-target:#3987e5; --c-context:#d95926; --c-gis:#199e70; --c-other:#c98500; --c-misc:#d55181;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:0 16px 48px;
+  padding-bottom:calc(48px + env(safe-area-inset-bottom,0px));
+  font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:1180px; margin:0 auto}
+header.top{padding:22px 0 10px; display:flex; flex-wrap:wrap; gap:6px 18px; align-items:baseline}
+h1{font:500 21px/1.2 "Unbounded","IBM Plex Sans",sans-serif; margin:0; letter-spacing:.005em; text-wrap:balance}
+.fresh{color:var(--muted); font-size:13px}
+.back{margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none}
+.back:hover{text-decoration:underline}
+
+/* панель периода */
+.controls{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:5;
+  background:var(--bg); padding:10px 0 12px; border-bottom:1px solid var(--line);
+  display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center;
+}
+.range{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.range label{font-size:13px; color:var(--muted)}
+input[type=date]{
+  font:inherit; font-size:14px; color:var(--ink); background:var(--panel);
+  border:1px solid var(--line); border-radius:8px; padding:6px 8px;
+}
+.presets{display:flex; gap:6px; flex-wrap:wrap}
+button.p{
+  font:inherit; font-size:13px; font-weight:500; color:var(--ink); background:var(--panel);
+  border:1px solid var(--line); border-radius:999px; padding:5px 12px; cursor:pointer;
+}
+button.p:hover{border-color:var(--accent)}
+button.p.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.toggle{display:flex; gap:7px; align-items:center; font-size:14px; cursor:pointer; user-select:none}
+.toggle input{width:17px; height:17px; accent-color:var(--accent); margin:0}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* итог по таргету */
+.summary{margin:18px 0 6px}
+.summary h2, section h2{font-size:15px; font-weight:600; margin:0 0 10px; color:var(--muted)}
+.tiles{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:12px; overflow:hidden}
+.tile{background:var(--panel); padding:12px 14px 13px}
+.tile .v{font-size:24px; font-weight:600; line-height:1.15; white-space:nowrap}
+.tile .l{font-size:13px; color:var(--muted); margin-top:2px}
+.tile.key .v{color:var(--accent)}
+.split{margin:10px 2px 0; font-size:14px; color:var(--muted); display:flex; flex-wrap:wrap; gap:4px 18px}
+.split b{color:var(--ink); font-weight:600}
+.note{margin:10px 0 0; padding:9px 12px; border-radius:8px; font-size:13.5px;
+  background:var(--warn-bg); color:var(--ink); border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+
+section{margin-top:26px}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--panel); box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; min-width:860px; font-size:14px}
+th,td{padding:8px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line)}
+th:nth-child(-n+3), td:nth-child(-n+3){text-align:left}
+thead th{font-size:12.5px; font-weight:600; color:var(--muted); background:var(--panel2); cursor:pointer; position:relative}
+thead th:hover{color:var(--ink)}
+thead th[aria-sort="ascending"]::after{content:" ▲"; font-size:10px}
+thead th[aria-sort="descending"]::after{content:" ▼"; font-size:10px}
+th:first-child, td:first-child{position:sticky; left:0; background:inherit; z-index:1}
+thead th:first-child{background:var(--panel2)}
+tbody tr{background:var(--panel)}
+tbody tr:hover{background:var(--panel2)}
+td.code{font-weight:600}
+tfoot tr{background:var(--panel2)}
+tfoot td{font-weight:600; border-bottom:none}
+tfoot tr + tr td{border-top:1px solid var(--line)}
+.dim{color:var(--muted)}
+.tube{display:inline-flex; align-items:center; gap:7px}
+.cap{width:10px; height:14px; border-radius:3px 3px 5px 5px; background:var(--c,var(--t-other)); flex:none;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.14)}
+.pill{display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:999px}
+.pill.on{background:var(--good-bg); color:var(--good)}
+.pill.off{background:var(--panel2); color:var(--muted)}
+.cps{font-weight:600}
+.cps.good{color:var(--good)} .cps.warn{color:var(--warn)} .cps.bad{color:var(--bad)}
+
+/* полосы по анализам */
+.bars{display:grid; gap:12px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 16px 12px}
+.bar{display:grid; grid-template-columns:150px 1fr 110px; gap:12px; align-items:center}
+.bar .name{display:flex; align-items:center; gap:8px; font-weight:600}
+.track{position:relative; height:22px; background:var(--panel2); border-radius:5px}
+.fill{position:absolute; left:0; top:0; bottom:0; border-radius:5px; background:var(--c)}
+.ref{position:absolute; top:-5px; bottom:-5px; width:0; border-left:2px dashed var(--ink); opacity:.55}
+.bar .val{text-align:right; font-weight:600}
+.bar .sub{grid-column:2 / 4; font-size:12.5px; color:var(--muted); margin-top:-6px}
+.legend{font-size:12.5px; color:var(--muted); display:flex; gap:6px; align-items:center; margin-top:2px}
+.legend i{display:inline-block; width:0; height:14px; border-left:2px dashed var(--ink); opacity:.55}
+
+/* динамика по дням */
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px}
+.chips button{font:inherit; font-size:13px; font-weight:500; color:var(--ink); background:var(--panel);
+  border:1px solid var(--line); border-radius:999px; padding:5px 12px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:7px}
+.chips button:hover{border-color:var(--accent)}
+.chips button.on{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.dyn{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden}
+.mtiles{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-bottom:1px solid var(--line)}
+.mtile{font:inherit; text-align:left; background:var(--panel); color:var(--ink); border:0;
+  border-right:1px solid var(--line); padding:11px 14px 12px; cursor:pointer}
+.mtile:last-child{border-right:0}
+.mtile .h{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted)}
+.mtile .sw{width:18px; height:0; border-top:3px solid var(--c); border-radius:2px; flex:none}
+.mtile .v{font-size:22px; font-weight:600; margin-top:3px; white-space:nowrap}
+.mtile:hover{background:var(--panel2)}
+/* галочка: видно, что плитка — переключатель линии */
+.mtile .cb{width:16px; height:16px; border-radius:4px; flex:none; border:1.5px solid var(--c);
+  background:var(--c); position:relative}
+.mtile .cb::after{content:""; position:absolute; left:4.5px; top:1px; width:4px; height:8px;
+  border:solid var(--panel); border-width:0 2px 2px 0; transform:rotate(45deg)}
+.mtile[aria-pressed="false"]{background:var(--panel2)}
+.mtile[aria-pressed="false"] .cb{background:transparent; border-color:var(--muted)}
+.mtile[aria-pressed="false"] .cb::after{display:none}
+.mtile[aria-pressed="false"] .v, .mtile[aria-pressed="false"] .sw{opacity:.4}
+.mtile[aria-pressed="false"] .sw{border-top-style:dotted}
+.chips-l{font-size:13px; color:var(--muted); align-self:center; margin-right:2px}
+.dyn-hint{margin:0; padding:8px 16px 0; font-size:12.5px; color:var(--muted)}
+.plots{position:relative; padding:6px 0 4px; touch-action:pan-y}
+.plots svg{display:block; width:100%}
+.scale-note{margin:0; padding:0 16px 10px; font-size:12px; color:var(--muted)}
+.tip{position:absolute; z-index:3; pointer-events:none; background:var(--ink); color:var(--bg);
+  border-radius:8px; padding:8px 10px; font-size:12.5px; line-height:1.5; min-width:150px;
+  box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.tip b{display:block; font-size:13px; margin-bottom:2px}
+.tip .r{display:flex; align-items:center; gap:7px; justify-content:space-between}
+.tip .r span:first-child{display:inline-flex; align-items:center; gap:6px}
+.tip i{display:inline-block; width:10px; height:0; border-top:3px solid var(--c)}
+.tip .w{opacity:.75; margin-top:3px}
+@media (max-width:620px){
+  .mtiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtile:nth-child(2){border-right:0}
+  .mtile:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .mtile .v{font-size:18px}
+}
+.foot{margin-top:26px; font-size:13px; color:var(--muted); max-width:72ch}
+.foot a{color:var(--accent)}
+.state{margin-top:40px; padding:18px; border:1px dashed var(--line); border-radius:12px; color:var(--muted)}
+
+/* переключатель разделов: коды таргета / продажи по каналам */
+.views{display:inline-flex; gap:2px; padding:3px; margin:0 0 8px; background:var(--panel2);
+  border:1px solid var(--line); border-radius:10px; max-width:100%}
+.views button{font:inherit; font-size:14px; font-weight:600; color:var(--muted); background:transparent;
+  border:0; border-radius:7px; padding:6px 14px; cursor:pointer; white-space:nowrap}
+.views button:hover{color:var(--ink)}
+.views button[aria-pressed="true"]{background:var(--panel); color:var(--ink); box-shadow:0 0 0 1px var(--line), var(--shadow)}
+/* плитки каналов: значение, доля и отклонение от нормы; они же — переключатели линий */
+.ctiles{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:1px; background:var(--line);
+  border-bottom:1px solid var(--line)}
+.ctiles .mtile{border:0; display:flex; flex-direction:column; gap:2px}
+.mtile .s{display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; font-size:12.5px; color:var(--muted)}
+.dev{display:inline-block; font-weight:600; font-size:12px; padding:1px 7px; border-radius:999px; white-space:nowrap}
+.dev.good{background:var(--good-bg); color:var(--good)}
+.dev.warn{background:var(--warn-bg); color:var(--warn)}
+.dev.bad{background:var(--bad-bg); color:var(--bad)}
+.dev.na{background:var(--panel2); color:var(--muted); font-weight:500}
+table.ct{min-width:600px}
+table.ct th, table.ct td{text-align:right}
+table.ct th:first-child, table.ct td:first-child{text-align:left}
+table.ct thead th{cursor:default}
+table.ct .sw{display:inline-block; width:14px; height:0; border-top:3px solid var(--c); border-radius:2px;
+  vertical-align:middle; margin-right:8px}
+@media (max-width:860px){ .ctiles{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:520px){ .ctiles{grid-template-columns:repeat(2,minmax(0,1fr))} .views button{padding:6px 10px; font-size:13.5px} }
+/* на телефоне таблица каналов помещается в ширину без прокрутки: при прокрутке вбок
+   закреплённая первая колонка наезжала на шапку («Продаж» → «одаж», правка 07.10.2026) */
+@media (max-width:640px){
+  table.ct{min-width:0; font-size:13px}
+  table.ct th, table.ct td{padding:7px 5px; white-space:normal}
+  table.ct th:first-child, table.ct td:first-child{position:static}
+  table.ct .sw{width:10px; margin-right:5px}
+  table.ct .dev{white-space:normal}
+}
+
+@media (max-width:860px){
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+  /* на телефоне панель дат высокая — закреплённая, она закрывала бы графики */
+  .controls{position:static}
+}
+@media (max-width:520px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tile .v{font-size:20px}
+  .bar{grid-template-columns:1fr 84px}
+  .bar .track{grid-column:1 / 3; grid-row:2}
+  .bar .sub{grid-column:1 / 3; margin-top:-4px}
+  h1{font-size:18px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .fill{transition:width .35s ease}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 id="h1">Дашборд по кодам (Envidicy)</h1>
+    <span class="fresh" id="fresh">Загружаю данные…</span>
+    <a class="back" href="./">Панель отчётов</a>
+  </header>
+  <nav class="views" id="views" aria-label="Раздел" hidden>
+    <button type="button" data-v="kody" aria-pressed="true">Таргет по кодам</button>
+    <button type="button" data-v="kanaly" aria-pressed="false">Продажи по каналам</button>
+  </nav>
+
+  <div class="controls" role="group" aria-label="Период">
+    <div class="range">
+      <label for="from">с</label><input type="date" id="from">
+      <label for="to">по</label><input type="date" id="to">
+    </div>
+    <div class="presets" id="presets">
+      <button class="p" data-p="today" type="button">Сегодня</button>
+      <button class="p" data-p="yesterday" type="button">Вчера</button>
+      <button class="p" data-p="7" type="button">7 дней</button>
+      <button class="p" data-p="14" type="button">14 дней</button>
+      <button class="p" data-p="month" type="button">Этот месяц</button>
+      <button class="p" data-p="all" type="button">Всё время</button>
+    </div>
+    <label class="toggle" for="noweekend"><input type="checkbox" id="noweekend">Без субботы и воскресенья</label>
+  </div>
+
+  <div id="app"></div>
+
+  <p class="foot" id="footKanaly" hidden>
+    Продажи — из таблиц менеджеров по дню продажи, как в ежедневных отчётах по источникам
+    SmartMed и SmartLab (они обновляют данные 6 раз в день): цифры те же, что в сводках
+    в Telegram. У SmartMed каждая строка таблицы менеджера — продажа (семья на одном номере —
+    несколько), у SmartLab одна сделка за день — одна продажа.
+    Норма дня — среднее за 4 прошлых таких же дня недели (понедельник сравнивается
+    с понедельниками: выходные всегда проседают); норма периода — сумма норм его дней.
+    Сегодняшний день ещё идёт и в сравнение с нормой не входит.
+    Зелёная метка — не ниже нормы больше чем на 10%, жёлтая — ниже на 10–25%,
+    красная — ниже больше чем на 25%; при норме меньше 8 продаж метка серая —
+    слишком мало для вывода.
+    «Прочее» у SmartMed и «Остальное» у SmartLab — источники, не попавшие ни в один канал;
+    «Другие» у SmartMed — TikTok, Аллерголаб/МО и продажи без сделки в Битриксе, «Прочие»
+    у SmartLab — TikTok, рассылка/врачи, ВНД и без сделки.
+    Продажи таргета SmartLab здесь и на вкладке кодов могут немного отличаться: там они
+    считаются по перепискам с кодом, здесь — по таблицам менеджеров.
+  </p>
+  <p class="foot" id="footKody">
+    Лиды считаются по дню обращения, продажи — по дню продажи из таблиц менеджеров.
+    <span id="footKodyText">Бюджет — расход кабинета SmartLab2 по кампаниям; код крео берётся из названия кампании.</span>
+    Кампании «Подписка» — набор подписчиков, в бюджет не входят.
+    «Открутка» — был ли расход по коду в последний день периода, за который есть бюджет.
+    Источник: <a id="footKodySrc" href="https://docs.google.com/spreadsheets/d/1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas/edit" target="_blank" rel="noopener">таблица кодов SmartLab</a>.
+  </p>
+</div>
+
+<script>
+const SHEET = "1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas";
+/* Направления раздела «Таргет по кодам». SmartMed добавлен 19.10.2026 (просьба
+   пользователя): его таблица кодов устроена так же, а лист «Расход» в ней собирается
+   из выгрузки Ads Manager ПО ОБЪЯВЛЕНИЯМ — у SmartMed код крео живёт не в названии
+   кампании, а в заранее подготовленном сообщении объявления. Окно from/to — дни,
+   за которые есть такой расход: лиды и продажи вне окна не показываются, иначе
+   цены считались бы по чужим дням. */
+const KODY_DIRS = {
+  sl: {name:"SmartLab", sheet:SHEET, organic:"340222", cabinet:"SmartLab2",
+       spendHow:"расход по кампаниям — из Envidicy по API (обновляется 6 раз в день), код крео берётся из названия кампании. Разбивка по кампаниям у Envidicy есть с 12.09.2026 — за 01–11.09 бюджета нет"},
+  sm: {name:"SmartMed", sheet:"11kmLkM-XkCeN7wPWnJB7uguCChL_7qvFT4RZUJVxxFI", organic:"780808",
+       cabinet:"SmartMed и SmartMed2", from:"2026-10-13", to:"2026-10-18",
+       spendHow:"код крео берётся из заранее подготовленного сообщения каждого объявления"},
+};
+delete KODY_DIRS.sm;   // Envidicy: пока только SmartLab
+let ORGANIC = "340222";
+const NOCODE = "без кода";
+const THEMES = {
+  "щитовидка": "--t-thyroid", "анемия": "--t-anemia", "гастро": "--t-gastro",
+  "биохимия": "--t-biochem", "органика Instagram": "--t-organic"
+};
+
+const csvUrl = (tab, sheet = SHEET) => `https://docs.google.com/spreadsheets/d/${sheet}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+
+function parseCSV(text){
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ","){ row.push(cell); cell = ""; }
+    else if (ch === "\n"){ row.push(cell); rows.push(row); row = []; cell = ""; }
+    else if (ch !== "\r") cell += ch;
+  }
+  if (cell !== "" || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+const num = (s) => { const v = parseFloat(String(s ?? "").replace(/\s/g,"").replace(",", ".")); return isFinite(v) ? v : 0; };
+const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+const money = new Intl.NumberFormat("ru-RU", {minimumFractionDigits:2, maximumFractionDigits:2});
+const int = new Intl.NumberFormat("ru-RU");
+const usd = (v) => "$" + money.format(v);
+const pct = (v) => (v*100).toLocaleString("ru-RU", {maximumFractionDigits: v < .1 ? 1 : 1}) + "%";
+
+let DAYS = [], SPEND = [], TAG = {}, MAXD = "", MAXS = "";
+let sortKey = "cps", sortDir = 1;
+
+function store(k, v){ try{ localStorage.setItem("kodyenv:"+k, JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ const v = localStorage.getItem("kodyenv:"+k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function addDays(s, n){ const [y,m,d] = s.split("-").map(Number); return ymd(new Date(y, m-1, d+n)); }
+function weekday(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d).getDay(); }
+function ru(s){ const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; }
+
+let CODES_ERR = "";
+const KD = {};          // по направлению: {DAYS, SPEND, TAG, MAXD, MAXS, ERR}
+let KODY_DIR = location.hash === "#kody-sm" ? "sl" : location.hash === "#kody" ? "sl"
+  : (load("kodyDir") === "sm" ? "sm" : "sl");
+
+async function loadKody(key){
+  const dir = KODY_DIRS[key], x = KD[key] = {DAYS:[], SPEND:[], TAG:{}, MAXD:"", MAXS:"", ERR:""};
+  const inWin = (d) => (!dir.from || d >= dir.from) && (!dir.to || d <= dir.to);
+  try{
+    const [a, b] = await Promise.all([fetch(csvUrl("По дням", dir.sheet)), fetch(csvUrl("Расход Envidicy", dir.sheet))]);
+    if (!a.ok) throw new Error("лист «По дням» не открылся");
+    x.DAYS = parseCSV(await a.text()).slice(1)
+      .filter(r => isDate(r[0]) && inWin(r[0])).map(r => ({d:r[0], code:r[1].trim(), leads:num(r[2]), sales:num(r[3])}));
+    // несуществующий лист gviz молча подменяет первым — берём «Расход», только если шапка его
+    const rs = b.ok ? parseCSV(await b.text()) : [];
+    x.SPEND = rs.length && /Расход/.test((rs[0] || []).join(",")) ? rs.slice(1)
+      .filter(r => isDate(r[0]) && inWin(r[0])).map(r => ({d:r[0], camp:r[1], code:r[2].trim(), theme:r[3].trim(), spend:num(r[4]),
+        fetched:(r[6] || "").trim()})) : [];
+  }catch(e){
+    x.ERR = e.message;
+  }
+  // Тема кода — по кампании, на которую ушло больше денег: коды переиспользуют
+  // (57 на 21.09 был и «врач назначил», и «гаст»), а лиды по коду не разделить.
+  const bySpend = {};
+  for (const s of x.SPEND) if (s.code && s.theme){
+    const k = s.code; (bySpend[k] = bySpend[k] || {})[s.theme] = (bySpend[k][s.theme] || 0) + s.spend;
+  }
+  for (const [code, t] of Object.entries(bySpend)) x.TAG[code] = Object.entries(t).sort((a, b) => b[1] - a[1])[0][0];
+  x.TAG[dir.organic] = "органика Instagram";
+  x.MAXD = x.DAYS.reduce((m, r) => r.d > m ? r.d : m, "");
+  x.MAXS = x.SPEND.reduce((m, r) => r.d > m ? r.d : m, "");
+}
+// переключение направления: все функции раздела читают эти общие переменные
+function useKody(key){
+  KODY_DIR = key; store("kodyDir", key);
+  const x = KD[key];
+  DAYS = x.DAYS; SPEND = x.SPEND; TAG = x.TAG; MAXD = x.MAXD; MAXS = x.MAXS; CODES_ERR = x.ERR;
+  ORGANIC = KODY_DIRS[key].organic;
+}
+
+async function init(){
+  // лист «Каналы» грузится параллельно и не зависит от листов кодов
+  const chP = loadChannels();
+  await Promise.all(Object.keys(KODY_DIRS).map(loadKody));
+  useKody(KODY_DIR);
+  await chP;
+
+  document.getElementById("noweekend").checked = !!load("noweekend");
+  const saved = load("range");
+  if (saved && isDate(saved.from) && isDate(saved.to) && !saved.preset){ setRange(saved.from, saved.to, null); }
+  setView(VIEW, true);
+}
+
+/* Раздел страницы: «kody» — таргет по кодам, «kanaly» — продажи по каналам.
+   Адрес #kanaly-sm / #kanaly-sl открывает сразу каналы нужного направления —
+   такую ссылку можно переслать. */
+function setView(v, first){
+  VIEW = v; store("view", v);
+  const hash = v === "kanaly" ? "#kanaly-" + CH_DIR : KODY_DIR === "sm" ? "#kody-sm" : "#kody";
+  if (!first || location.hash){ try{ history.replaceState(null, "", hash); }catch(e){} }
+  document.querySelectorAll("#views button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
+  const KDIR = KODY_DIRS[KODY_DIR];
+  const title = v === "kanaly" ? `Продажи ${CH_DIRS[CH_DIR].name} по каналам` : `Дашборд по кодам (Envidicy)`;
+  document.getElementById("h1").textContent = title; document.title = title;
+  document.getElementById("footKody").hidden = v !== "kody";
+  document.getElementById("footKodyText").innerHTML =
+    `Бюджет — расход кабинет${KODY_DIR === "sm" ? "ов" : "а"} ${KDIR.cabinet}; ${KDIR.spendHow}.`
+    + (KDIR.from ? ` Данные SmartMed показаны за ${ru(KDIR.from)} — ${ru(KDIR.to)}: за эти дни собран расход по объявлениям.` : "")
+    + ` У органики Instagram (код ${KDIR.organic}) бюджета нет, поэтому цены лида и продажи у неё не считаются.`;
+  const src = document.getElementById("footKodySrc");
+  src.href = `https://docs.google.com/spreadsheets/d/${KDIR.sheet}/edit`; src.textContent = `таблица кодов ${KDIR.name}`;
+  document.getElementById("footKanaly").hidden = v !== "kanaly";
+  const fr = document.getElementById("fresh");
+  if (v === "kanaly") fr.textContent = CH_ERR || !MAXC ? "" : `продажи по ${ru(MAXC)}`
+    + (CH_UPD ? `, обновлено ${ru(CH_UPD.slice(0, 10)).slice(0, 5)} в ${CH_UPD.slice(11, 16)}` : "");
+  else fr.textContent = CODES_ERR || !MAXD ? "" : `лиды и продажи по ${ru(MAXD)}`
+    + (MAXS ? `, бюджет по ${ru(MAXS)}` : ", бюджета пока нет");
+  // кнопка периода («7 дней» и т.п.) пересчитывается от последнего дня данных раздела
+  const saved = load("range");
+  if (!saved || saved.preset || !isDate(saved.from)) applyPreset((saved && saved.preset) || "7");
+  render();
+}
+document.getElementById("views").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (b && b.dataset.v !== VIEW) setView(b.dataset.v);
+});
+
+function applyPreset(p){
+  const end = (VIEW === "kanaly" ? MAXC : MAXD) || ymd(new Date());
+  let from = end, to = end;
+  if (p === "yesterday"){ from = to = addDays(end, -1); }
+  else if (p === "7"){ from = addDays(end, -6); }
+  else if (p === "14"){ from = addDays(end, -13); }
+  else if (p === "month"){ from = end.slice(0,8) + "01"; }
+  else if (p === "all"){ from = VIEW === "kanaly" ? MINC : DAYS.reduce((m, r) => !m || r.d < m ? r.d : m, ""); }
+  setRange(from, to, p);
+}
+function setRange(from, to, preset){
+  document.getElementById("from").value = from;
+  document.getElementById("to").value = to;
+  document.querySelectorAll("button.p").forEach(b => b.classList.toggle("on", b.dataset.p === preset));
+  store("range", {from, to, preset: preset || null});
+}
+
+function compute(){
+  let from = document.getElementById("from").value, to = document.getElementById("to").value;
+  if (from > to) [from, to] = [to, from];
+  const noWe = document.getElementById("noweekend").checked;
+  const inR = (d) => d >= from && d <= to && !(noWe && [0,6].includes(weekday(d)));
+  const rows = {};
+  const get = (c) => rows[c] || (rows[c] = {code:c, leads:0, sales:0, spend:0, lastSpend:null});
+  for (const r of DAYS) if (inR(r.d)){ const x = get(r.code); x.leads += r.leads; x.sales += r.sales; }
+  const spendDays = new Set();
+  // день, выгруженный в тот же день (он ещё шёл), — бюджет за него неполный
+  const partial = {};
+  // День «с бюджетом» = день, за который выгрузка ЕСТЬ, даже если реклама с кодами
+  // в него не крутилась. Раньше считались только дни с расходом по коду, и
+  // 12–15.09.2026 (открутка стояла, шла лишь «Подписка» без кода) выглядели как
+  // несработавшая выгрузка: «бюджет за 26 из 30 дн.» при полных данных (02.10.2026).
+  for (const s of SPEND) if (inR(s.d)){
+    spendDays.add(s.d);
+    if (s.fetched && s.fetched.slice(0, 10) <= s.d) partial[s.d] = s.fetched.slice(11, 16);
+    if (s.code) get(s.code).spend += s.spend;
+  }
+  // открутка: был ли расход в последний день периода, за который есть бюджет
+  const lastBudgetDay = [...spendDays].sort().pop() || null;
+  if (lastBudgetDay){
+    for (const s of SPEND) if (s.d === lastBudgetDay && s.code && s.spend > 0) get(s.code).lastSpend = true;
+  }
+  // дни периода (с учётом фильтра) — для покрытия бюджетом
+  let total = 0, cur = from; const days = [];
+  while (cur <= to){ if (inR(cur)){ total++; days.push(cur); } cur = addDays(cur, 1); }
+  const list = Object.values(rows).map(x => ({
+    ...x, theme: x.code === NOCODE ? "" : (TAG[x.code] || ""),
+    cpl: x.spend && x.leads ? x.spend / x.leads : null,
+    conv: x.leads ? x.sales / x.leads : null,
+    cps: x.spend && x.sales ? x.spend / x.sales : null,
+    // у органики бюджета нет — «идёт/стоит» к ней неприменимо
+    status: x.code === NOCODE || x.code === ORGANIC || !lastBudgetDay ? null : !!x.lastSpend
+  }));
+  return {from, to, noWe, list, budgetDays: spendDays.size, totalDays: total, lastBudgetDay, partial, days};
+}
+
+function agg(items){
+  const s = items.reduce((a, x) => ({leads:a.leads+x.leads, sales:a.sales+x.sales, spend:a.spend+x.spend}), {leads:0, sales:0, spend:0});
+  return {...s, cpl: s.spend && s.leads ? s.spend/s.leads : null, conv: s.leads ? s.sales/s.leads : null,
+          cps: s.spend && s.sales ? s.spend/s.sales : null};
+}
+
+function grade(cps, ref){
+  if (cps == null || ref == null) return "";
+  return cps <= ref ? "good" : cps <= ref*1.5 ? "warn" : "bad";
+}
+
+function chip(theme){
+  const v = THEMES[theme] || "--t-other";
+  return `<span class="tube"><span class="cap" style="--c:var(${v})"></span>${theme || '<span class="dim">—</span>'}</span>`;
+}
+
+const COLS = [
+  ["code","Код"],["theme","Анализ"],["status","Открутка"],["spend","Бюджет"],["leads","Лидов"],
+  ["cpl","Цена лида"],["sales","Продаж"],["conv","Конверсия"],["cps","Цена продажи"]
+];
+
+function kodyDirChips(){
+  return `<div class="chips" id="kodyDir" role="group" aria-label="Направление" style="margin-top:18px"><span class="chips-l">Направление:</span>${
+    Object.entries(KODY_DIRS).map(([k, d]) => `<button type="button" data-d="${k}" class="${KODY_DIR === k ? "on" : ""}" aria-pressed="${KODY_DIR === k}">${d.name}</button>`).join("")}</div>`;
+}
+function bindKodyDir(){
+  document.getElementById("kodyDir").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b || b.dataset.d === KODY_DIR) return;
+    useKody(b.dataset.d); setView("kody"); };
+}
+
+function render(){
+  if (VIEW === "kanaly") return renderCh();
+  if (CODES_ERR){
+    document.getElementById("app").innerHTML = kodyDirChips() +
+      `<div class="state">Не получилось загрузить таблицу кодов ${KODY_DIRS[KODY_DIR].name} (${CODES_ERR}). Проверьте интернет и обновите страницу.</div>`;
+    bindKodyDir();
+    return;
+  }
+  renderKody();
+}
+
+function renderKody(){
+  const R = compute();
+  const creo = R.list.filter(x => x.code !== ORGANIC && x.code !== NOCODE);
+  const T = agg(R.list), C = agg(creo);
+  const org = R.list.find(x => x.code === ORGANIC), nc = R.list.find(x => x.code === NOCODE);
+  const ref = T.cps;
+
+  const sorted = [...creo].sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (sortKey === "code") return sortDir * (Number(a.code) - Number(b.code));
+    if (sortKey === "theme") return sortDir * String(va).localeCompare(String(vb), "ru");
+    // пустые (нет продаж / нет бюджета) — всегда в конце
+    if (va == null && vb == null) return (b.spend - a.spend);
+    if (va == null) return 1; if (vb == null) return -1;
+    return sortDir * (va - vb) || (b.leads - a.leads);
+  });
+  const tail = [org, nc].filter(Boolean);
+
+  const cell = (x, k) => {
+    const v = x[k];
+    switch (k){
+      case "code": return `<td class="code">${x.code}</td>`;
+      case "theme": return `<td>${x.code === NOCODE ? '<span class="dim">клиент не прислал код</span>' : chip(x.theme)}</td>`;
+      case "status": return `<td>${v == null ? '<span class="dim">—</span>' : v ? '<span class="pill on">идёт</span>' : '<span class="pill off">стоит</span>'}</td>`;
+      case "spend": return `<td>${x.spend ? usd(x.spend) : '<span class="dim">—</span>'}</td>`;
+      case "leads": case "sales": return `<td>${int.format(v)}</td>`;
+      case "cpl": return `<td>${v == null ? '<span class="dim">—</span>' : usd(v)}</td>`;
+      case "conv": return `<td>${v == null ? '<span class="dim">—</span>' : pct(v)}</td>`;
+      case "cps": return `<td>${v == null ? (x.spend ? '<span class="cps bad">нет продаж</span>' : '<span class="dim">—</span>')
+                          : `<span class="cps ${grade(v, ref)}">${usd(v)}</span>`}</td>`;
+    }
+  };
+  const tr = (x) => `<tr>${COLS.map(([k]) => cell(x, k)).join("")}</tr>`;
+  const totRow = (label, a) => `<tr><td>${label}</td><td></td><td></td><td>${a.spend ? usd(a.spend) : "—"}</td>
+    <td>${int.format(a.leads)}</td><td>${a.cpl == null ? "—" : usd(a.cpl)}</td><td>${int.format(a.sales)}</td>
+    <td>${a.conv == null ? "—" : pct(a.conv)}</td><td>${a.cps == null ? "—" : usd(a.cps)}</td></tr>`;
+
+  // по анализам
+  const byTheme = {};
+  for (const x of R.list){
+    if (x.code === NOCODE) continue;
+    const t = x.theme || "без темы";
+    (byTheme[t] = byTheme[t] || []).push(x);
+  }
+  const themes = Object.entries(byTheme).map(([t, xs]) => ({t, ...agg(xs)}))
+    .filter(t => t.spend || t.sales)
+    .sort((a, b) => (a.cps ?? Infinity) - (b.cps ?? Infinity));
+  const maxC = Math.max(ref || 0, ...themes.map(t => t.cps || 0)) * 1.08 || 1;
+  const bars = themes.map(t => {
+    const w = t.cps ? (t.cps / maxC * 100) : 0;
+    return `<div class="bar">
+      <div class="name">${chip(t.t)}</div>
+      <div class="track" aria-hidden="true">
+        <div class="fill" style="width:${w}%; --c:var(${THEMES[t.t] || "--t-other"})"></div>
+        ${ref ? `<div class="ref" style="left:${ref / maxC * 100}%"></div>` : ""}
+      </div>
+      <div class="val">${t.cps ? `<span class="cps ${grade(t.cps, ref)}">${usd(t.cps)}</span>` : '<span class="cps bad">нет продаж</span>'}</div>
+      <div class="sub">${t.spend ? usd(t.spend) + " · " : ""}${int.format(t.leads)} лидов · ${int.format(t.sales)} продаж${t.conv != null ? " · конверсия " + pct(t.conv) : ""}</div>
+    </div>`;
+  }).join("");
+
+  const coverage = R.budgetDays < R.totalDays
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed по объявлениям собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Бюджет из Facebook есть с 01.09.2026; дни, когда выгрузка не сработала, не заполнены."}</p>`
+    : "";
+  const partialDays = Object.keys(R.partial).sort();
+  const partialNote = partialDays.length
+    ? `<p class="note">Бюджет неполный за ${partialDays.map(d => `${ru(d)} (выгружен в ${R.partial[d]}, день ещё шёл)`).join(", ")}. Ночная выгрузка заменит его полной суммой.</p>`
+    : "";
+
+  document.getElementById("app").innerHTML = `${kodyDirChips()}
+  <div class="summary">
+    <h2>Весь таргет ${KODY_DIRS[KODY_DIR].name}: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
+    <div class="tiles">
+      <div class="tile"><div class="v">${T.spend ? usd(T.spend) : "—"}</div><div class="l">бюджет</div></div>
+      <div class="tile"><div class="v">${int.format(T.leads)}</div><div class="l">лидов</div></div>
+      <div class="tile"><div class="v">${T.cpl == null ? "—" : usd(T.cpl)}</div><div class="l">цена лида</div></div>
+      <div class="tile"><div class="v">${int.format(T.sales)}</div><div class="l">продаж</div></div>
+      <div class="tile"><div class="v">${T.conv == null ? "—" : pct(T.conv)}</div><div class="l">конверсия в продажу</div></div>
+      <div class="tile key"><div class="v">${T.cps == null ? "—" : usd(T.cps)}</div><div class="l">цена продажи</div></div>
+    </div>
+    <div class="split">
+      <span>с кодом крео: <b>${C.sales}</b> продаж${C.cps ? " по " + usd(C.cps) : ""}</span>
+      <span>органика Instagram: <b>${org ? org.sales : 0}</b></span>
+      <span>без кода: <b>${nc ? nc.sales : 0}</b></span>
+    </div>
+    ${coverage}${partialNote}
+  </div>
+
+  <section>
+    <h2 id="dynTitle">Динамика по дням</h2>
+    <div class="chips" id="stepChips" role="group" aria-label="Шаг графика"></div>
+    <div class="chips" id="dynChips" role="group" aria-label="Направление"></div>
+    <div class="dyn">
+      <div class="mtiles" id="mtiles"></div>
+      <p class="dyn-hint">Нажмите на плитку, чтобы показать или скрыть её линию на графике.</p>
+      <div class="plots" id="plots"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>По кодам креативов</h2>
+    <div class="tablebox"><table>
+      <thead><tr>${COLS.map(([k, l]) => `<th scope="col" data-k="${k}" tabindex="0" aria-sort="${k === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none"}">${l}</th>`).join("")}</tr></thead>
+      <tbody>${sorted.map(tr).join("")}${tail.map(tr).join("")}</tbody>
+      <tfoot>${totRow("Итого крео", C)}${totRow("Весь таргет", T)}</tfoot>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Цена продажи по анализам</h2>
+    <div class="bars">${bars || '<div class="dim">В этом периоде нет ни бюджета, ни продаж.</div>'}
+      ${ref ? `<div class="legend"><i></i> средняя по всему таргету — ${usd(ref)}</div>` : ""}
+    </div>
+  </section>`;
+
+  LAST_R = R;
+  bindKodyDir();
+  drawDyn(R);
+
+  document.querySelectorAll("thead th").forEach(th => {
+    const go = () => {
+      const k = th.dataset.k;
+      if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = ["leads","sales","spend","conv"].includes(k) ? -1 : 1; }
+      render();
+    };
+    th.addEventListener("click", go);
+    th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
+  });
+}
+
+/* ===== динамика по дням =====
+   Один график, четыре линии — как в Google Ads (просьба пользователя 01.10.2026).
+   Метрики разного масштаба (штуки и доллары), поэтому у каждой линии СВОЯ шкала
+   от нуля до её максимума: по высоте сравнивается форма, а не величина; точные
+   цифры дня — в подсказке. Плитки сверху включают/выключают линии и служат легендой. */
+const THEME_ORDER = ["щитовидка", "анемия", "гастро", "биохимия", "органика Instagram"];
+const METRICS = [
+  {k:"leads", l:"Лиды",         c:"--m-leads", f:(v) => int.format(v)},
+  {k:"sales", l:"Продажи",      c:"--m-sales", f:(v) => int.format(v)},
+  {k:"cpl",   l:"Цена лида",    c:"--m-cpl",   f:(v) => usd(v)},
+  {k:"cps",   l:"Цена продажи", c:"--m-cps",   f:(v) => usd(v)},
+];
+let LAST_R = null;
+let dynTheme = load("dynTheme") || "all";
+// по умолчанию — лиды и цена лида: вчетвером линии читаются хуже (пользователь 01.10.2026),
+// продажи и цену продажи включают нажатием на плитку
+let dynOn = load("dynOn2") || {leads:true, sales:false, cpl:true, cps:false};
+const WD = ["вс","пн","вт","ср","чт","пт","сб"];
+// шаг графика: по дням или по календарным неделям пн–вс (просьба пользователя 05.10.2026)
+let dynStep = load("dynStep") === "week" ? "week" : "day";
+
+// Дни → недели. Лиды, продажи и бюджет складываются, цены пересчитываются из сумм
+// (не среднее дневных цен). Крайние недели периода бывают неполными — это видно
+// по числу дней в подсказке.
+function weekly(S){
+  const out = [], idx = {};
+  for (const x of S){
+    const mon = addDays(x.d, -((weekday(x.d) + 6) % 7));
+    let w = idx[mon];
+    if (!w){ w = idx[mon] = {d:x.d, d2:x.d, mon, n:0, leads:0, sales:0, spend:0}; out.push(w); }
+    w.d2 = x.d; w.n++; w.leads += x.leads; w.sales += x.sales; w.spend += x.spend;
+  }
+  for (const w of out){
+    w.cpl = w.spend && w.leads ? w.spend / w.leads : null;
+    w.cps = w.spend && w.sales ? w.spend / w.sales : null;
+  }
+  return out;
+}
+
+function dynSeries(R){
+  const match = dynTheme === "all" ? () => true : (code) => TAG[code] === dynTheme;
+  const by = Object.fromEntries(R.days.map(d => [d, {leads:0, sales:0, spend:0}]));
+  for (const r of DAYS) if (by[r.d] && match(r.code)){ by[r.d].leads += r.leads; by[r.d].sales += r.sales; }
+  for (const s of SPEND) if (by[s.d] && s.code && match(s.code)) by[s.d].spend += s.spend;
+  return R.days.map(d => {
+    const x = by[d];
+    return {d, leads:x.leads, sales:x.sales, spend:x.spend,
+      cpl: x.spend && x.leads ? x.spend / x.leads : null,
+      cps: x.spend && x.sales ? x.spend / x.sales : null};
+  });
+}
+
+function drawDyn(R){
+  // направления, по которым в периоде есть хоть что-то
+  const present = new Set(R.list.filter(x => x.code !== NOCODE && (x.leads || x.sales || x.spend) && x.theme).map(x => x.theme));
+  const themes = [...THEME_ORDER.filter(t => present.has(t)), ...[...present].filter(t => !THEME_ORDER.includes(t)).sort()];
+  if (dynTheme !== "all" && !present.has(dynTheme)) dynTheme = "all";
+  const chips = document.getElementById("dynChips");
+  // без цветных значков: цвет на графике принадлежит метрикам, иначе линию
+  // «цена лида» принимали за «щитовидку» (тот же жёлтый) — правка 01.10.2026
+  chips.innerHTML = `<span class="chips-l">Направление:</span>` +
+    [`<button type="button" data-t="all" class="${dynTheme === "all" ? "on" : ""}" aria-pressed="${dynTheme === "all"}">Весь таргет</button>`,
+     ...themes.map(t => `<button type="button" data-t="${t}" class="${dynTheme === t ? "on" : ""}" aria-pressed="${dynTheme === t}">${t}</button>`)].join("");
+  chips.onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    dynTheme = b.dataset.t; store("dynTheme", dynTheme); drawDyn(LAST_R); };
+
+  const week = dynStep === "week";
+  document.getElementById("dynTitle").textContent = week ? "Динамика по неделям" : "Динамика по дням";
+  const steps = document.getElementById("stepChips");
+  steps.innerHTML = `<span class="chips-l">Шаг:</span>` +
+    [["day", "по дням"], ["week", "по неделям"]].map(([k, l]) =>
+      `<button type="button" data-s="${k}" class="${dynStep === k ? "on" : ""}" aria-pressed="${dynStep === k}">${l}</button>`).join("");
+  steps.onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    dynStep = b.dataset.s; store("dynStep", dynStep); drawDyn(LAST_R); };
+
+  const S = week ? weekly(dynSeries(R)) : dynSeries(R);
+  // полная неделя: 7 дней, а с галкой «без выходных» — 5
+  const fullWeek = R.noWe ? 5 : 7;
+  const tot = S.reduce((a, x) => ({leads:a.leads+x.leads, sales:a.sales+x.sales, spend:a.spend+x.spend}), {leads:0, sales:0, spend:0});
+  const totV = {leads:tot.leads, sales:tot.sales,
+    cpl: tot.spend && tot.leads ? tot.spend/tot.leads : null, cps: tot.spend && tot.sales ? tot.spend/tot.sales : null};
+
+  const tiles = document.getElementById("mtiles");
+  tiles.innerHTML = METRICS.map(m => `<button type="button" class="mtile" data-k="${m.k}" aria-pressed="${!!dynOn[m.k]}" style="--c:var(${m.c})"
+      title="${dynOn[m.k] ? "Скрыть" : "Показать"} линию «${m.l}» на графике">
+    <span class="h"><span class="cb" aria-hidden="true"></span><span class="sw"></span>${m.l}</span>
+    <span class="v">${totV[m.k] == null ? "—" : m.f(totV[m.k])}</span></button>`).join("");
+  tiles.onclick = (e) => { const b = e.target.closest(".mtile"); if (!b) return;
+    const k = b.dataset.k, next = {...dynOn, [k]: !dynOn[k]};
+    if (!Object.values(next).some(Boolean)) return;            // хотя бы один график остаётся
+    dynOn = next; store("dynOn2", dynOn); drawDyn(LAST_R); };
+
+  const host = document.getElementById("plots");
+  if (!S.length){ host.innerHTML = '<div class="state" style="margin:12px">В периоде нет дней.</div>'; return; }
+  const on = METRICS.filter(m => dynOn[m.k]);
+  const W = Math.max(280, host.clientWidth || 600);
+  const narrow = W < 620;
+  // оси с цифрами: слева — первая включённая метрика, справа — вторая (как в Google Ads);
+  // у третьей и четвёртой оси нет, их цифры — в подсказке
+  const axL = on[0], axR = on[1];
+  const pL = axL ? 52 : 16, pR = axR ? 52 : 16, H = narrow ? 300 : 380, top = 34, bot = 34;
+  const n = S.length;
+  const X = (i) => n === 1 ? W / 2 : pL + i * (W - pL - pR) / (n - 1);
+  // у каждой линии своя шкала 0…«круглый» максимум: делится на 4 ровные доли,
+  // поэтому подписи осей получаются круглыми (0, 30, 60, 90, 120)
+  const nice = (v) => {
+    if (!(v > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+    const k = [1, 1.2, 1.6, 2, 2.4, 3, 4, 5, 6, 8, 10].find(s => f <= s * 1.0001);
+    return k * p;
+  };
+  const maxes = Object.fromEntries(on.map(m => [m.k, nice(Math.max(...S.map(x => x[m.k]).filter(v => v != null), 0))]));
+  const Y = (k, v) => top + (H - top - bot) * (1 - v / maxes[k]);
+  const tickTxt = (m, v) => m.k === "leads" || m.k === "sales"
+    ? int.format(Math.round(v))
+    : "$" + v.toLocaleString("ru-RU", {minimumFractionDigits: v < 10 ? 2 : 0, maximumFractionDigits: v < 10 ? 2 : 0});
+
+  const grid = [0, .25, .5, .75, 1].map(f => {
+    const y = top + (H - top - bot) * f;
+    const lab = (m, x, anchor) => m ? `<text x="${x}" y="${y + 4}" text-anchor="${anchor}" style="fill:var(--muted);font-size:11.5px">${tickTxt(m, maxes[m.k] * (1 - f))}</text>` : "";
+    return `<line x1="${pL}" x2="${W - pR}" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:1;${f < 1 ? "opacity:.55" : ""}"/>`
+      + lab(axL, pL - 8, "end") + lab(axR, W - pR + 8, "start");
+  }).join("");
+  // подписи осей: название метрики с её цветом над каждой осью
+  const axTitle = (m, x, anchor) => m ? `<g>
+      <line x1="${anchor === "start" ? x : x - 14}" x2="${anchor === "start" ? x + 14 : x}" y1="14" y2="14" style="stroke:var(${m.c});stroke-width:3;stroke-linecap:round"/>
+      <text x="${anchor === "start" ? x + 20 : x - 20}" y="18" text-anchor="${anchor}" style="fill:var(--ink);font-size:12px;font-weight:600">${m.l}</text></g>` : "";
+  const axTitles = axTitle(axL, 16, "start") + axTitle(axR, W - 16, "end");
+  const step = Math.max(1, Math.ceil(n / (narrow ? 5 : 10)));
+  const axis = S.map((x, i) => (i % step === 0 || i === n - 1) && !(i !== n - 1 && n - 1 - i < step / 2)
+    ? `<text x="${X(i).toFixed(1)}" y="${H - 12}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}"
+         style="fill:var(--muted);font-size:11.5px">${x.d.slice(8)}.${x.d.slice(5,7)}</text>` : "").join("");
+  // порядок отрисовки: лиды поверх остальных
+  const lines = [...on].reverse().map(m => {
+    const vals = S.map(x => x[m.k]);
+    let d = "", pen = false;
+    vals.forEach((v, i) => { if (v == null){ pen = false; return; } d += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(m.k, v).toFixed(1); pen = true; });
+    // неполная неделя (край периода) — пустая точка: её «провал» не настоящий
+    const hollow = (i) => week && S[i].n < fullWeek;
+    const dots = n <= 45 ? vals.map((v, i) => v == null ? "" : hollow(i)
+      ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(m.k, v).toFixed(1)}" r="3.5" style="fill:var(--panel);stroke:var(${m.c});stroke-width:2"/>`
+      : `<circle cx="${X(i).toFixed(1)}" cy="${Y(m.k, v).toFixed(1)}" r="3" style="fill:var(${m.c});stroke:var(--panel);stroke-width:1.5"/>`).join("") : "";
+    return `<path d="${d}" fill="none" style="stroke:var(${m.c});stroke-width:2.25;stroke-linejoin:round;stroke-linecap:round"/>${dots}`;
+  }).join("");
+  const hps = on.map(m => `<circle class="hp" data-k="${m.k}" r="5.5" cx="-10" cy="-10" style="fill:var(${m.c});stroke:var(--panel);stroke-width:2"/>`).join("");
+
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Лиды, продажи, цена лида и цена продажи ${week ? "по неделям" : "по дням"}">
+      ${axTitles}${grid}${axis}
+      <line class="xh" x1="-10" x2="-10" y1="${top}" y2="${H - bot}" style="stroke:var(--ink);stroke-width:1;opacity:0"/>
+      ${lines}${hps}
+    </svg>
+    <p class="scale-note">${on.length > 2
+      ? `Шкала слева — «${axL.l}», справа — «${axR.l}». У остальных линий шкала своя, их точные цифры — в подсказке при наведении.`
+      : on.length === 2 ? `Шкала слева — «${axL.l}», справа — «${axR.l}».` : ""}${
+      week && S.some(x => x.n < fullWeek) ? " Пустая точка — неделя попала в период не целиком, сравнивать её с полными нельзя." : ""}</p>
+    <div class="tip" id="tip" hidden></div>`;
+
+  // наведение: ближайший день, вертикальная линия, точки на линиях, подсказка со всеми метриками дня
+  const tip = document.getElementById("tip");
+  const move = (ev) => {
+    const rect = host.querySelector("svg").getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round(n === 1 ? 0 : (px - pL) / ((W - pL - pR) / (n - 1)))));
+    const x = S[i];
+    const xh = host.querySelector(".xh");
+    xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.style.opacity = .35;
+    host.querySelectorAll(".hp").forEach(c => {
+      const v = x[c.dataset.k];
+      if (v == null) c.setAttribute("cx", -10);
+      else { c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(c.dataset.k, v)); }
+    });
+    const head = week
+      ? `<b>${ru(x.d).slice(0, 5)} — ${ru(x.d2)}</b>${x.n < fullWeek ? `<div class="w">неполная неделя: ${x.n} из ${fullWeek} дн.</div>` : ""}`
+      : `<b>${WD[weekday(x.d)]}, ${ru(x.d)}</b>`;
+    // неделя с неполным днём бюджета (день ещё шёл при выгрузке) — тоже неполная по бюджету
+    const part = week ? R.days.some(d => d >= x.d && d <= x.d2 && R.partial[d]) : !!R.partial[x.d];
+    tip.innerHTML = head + METRICS.map(m =>
+      `<div class="r"><span><i style="--c:var(${m.c})"></i>${m.l}</span><span>${x[m.k] == null ? "—" : m.f(x[m.k])}</span></div>`).join("")
+      + `<div class="w">бюджет ${x.spend ? usd(x.spend) : "—"}${part ? " · неполный" : ""}</div>`;
+    tip.hidden = false;
+    const hr = host.getBoundingClientRect();
+    const tx = ev.clientX - hr.left, tw = tip.offsetWidth;
+    tip.style.left = Math.max(4, Math.min(hr.width - tw - 4, tx + 14 > hr.width - tw ? tx - tw - 14 : tx + 14)) + "px";
+    tip.style.top = Math.max(4, Math.min(H - tip.offsetHeight, ev.clientY - hr.top - tip.offsetHeight / 2)) + "px";
+  };
+  const leave = () => {
+    tip.hidden = true;
+    host.querySelector(".xh").style.opacity = 0;
+    host.querySelectorAll(".hp").forEach(c => c.setAttribute("cx", -10));
+  };
+  host.onpointermove = move; host.onpointerdown = move; host.onpointerleave = leave;
+}
+
+/* ===== раздел «Продажи по каналам» (просьба пользователя 07.10.2026) =====
+   Два направления — SmartMed (по умолчанию: ради него раздел и просили) и SmartLab.
+   Данные — листы «Каналы SmartMed» и «Каналы» таблицы кодов. Их пишут отчёты по
+   источникам при каждом из 6 прогонов: только даты и числа, без ФИО и телефонов
+   приёмного дока. Норма дня — среднее 4 прошлых таких же дней недели, та же, что
+   в ночной сводке в Telegram (deploy/sales_norm.py). Шкала у графика одна на все
+   линии: все они — штуки продаж. Подписи каналов — как в сводке своего направления. */
+const CH_DIRS = {
+  sm: {name:"SmartMed", tab:"Каналы SmartMed", report:"SmartMed",
+       labels:{total:"Всего", target:"Таргет", context:"Контекст", gis:"2ГИС", other:"Прочее", misc:"Другие"}},
+  sl: {name:"SmartLab", tab:"Каналы", report:"SmartLab",
+       labels:{total:"Всего", target:"Таргет", context:"Контекст", gis:"2ГИС", other:"Остальное", misc:"Прочие"}},
+};
+const CH_BASE = [
+  {k:"total", c:"--c-total"}, {k:"target", c:"--c-target"}, {k:"context", c:"--c-context"},
+  {k:"gis", c:"--c-gis"}, {k:"other", c:"--c-other"}, {k:"misc", c:"--c-misc"},
+];
+const SMALL_NORM = 8;   // при норме меньше — цвет не ставим: шум, а не вывод
+const CH_DATA = {};     // по направлению: {CH, UPD, MAX, MIN, ERR}
+let CHS = [], CH = {}, CH_UPD = "", MAXC = "", MINC = "", CH_ERR = "";
+const H0 = location.hash;
+let VIEW = H0.startsWith("#kanaly") ? "kanaly" : H0.startsWith("#kody") ? "kody"
+  : (load("view") === "kanaly" ? "kanaly" : "kody");
+let CH_DIR = H0 === "#kanaly-sl" ? "sl" : H0 === "#kanaly-sm" ? "sm" : (load("chDir") === "sl" ? "sl" : "sm");
+let chOn = load("chOn") || {total:true, target:true, context:true, gis:false, other:true, misc:false};
+let chStep = load("chStep") === "week" ? "week" : "day";
+let LAST_CH = null;
+
+async function loadDir(key){
+  const dir = CH_DIRS[key], x = CH_DATA[key] = {CH:{}, UPD:"", MAX:"", MIN:"", ERR:""};
+  try{
+    const r = await fetch(csvUrl(dir.tab));
+    if (!r.ok) throw new Error(`лист «${dir.tab}» не открылся`);
+    const rows = parseCSV(await r.text());
+    const hdr = (rows[0] || []).map(s => s.trim());
+    const ix = Object.fromEntries(CH_BASE.map(c => [c.k, hdr.indexOf(dir.labels[c.k])]));
+    const iu = hdr.indexOf("Обновлено");
+    // несуществующий лист gviz молча подменяет первым — проверяем шапку
+    if (ix.total < 0 || ix.target < 0 || ix.other < 0) throw new Error(`лист «${dir.tab}» не найден`);
+    for (const row of rows.slice(1)){
+      if (!isDate(row[0])) continue;
+      x.CH[row[0]] = Object.fromEntries(CH_BASE.map(c => [c.k, ix[c.k] < 0 ? 0 : num(row[ix[c.k]])]));
+      const u = iu >= 0 ? (row[iu] || "").trim() : "";
+      if (u > x.UPD) x.UPD = u;
+    }
+    const ds = Object.keys(x.CH).sort(); x.MIN = ds[0] || ""; x.MAX = ds[ds.length - 1] || "";
+    if (!x.MAX) throw new Error(`в листе «${dir.tab}» нет дней`);
+  }catch(e){ x.ERR = e.message; }
+}
+async function loadChannels(){ await Promise.all(Object.keys(CH_DIRS).map(loadDir)); useDir(CH_DIR); }
+// переключение направления: все функции раздела читают эти общие переменные
+function useDir(key){
+  CH_DIR = key; store("chDir", key);
+  const x = CH_DATA[key] || {CH:{}, UPD:"", MAX:"", MIN:"", ERR:"нет данных"};
+  CH = x.CH; CH_UPD = x.UPD; MAXC = x.MAX; MINC = x.MIN; CH_ERR = x.ERR;
+  CHS = CH_BASE.map(c => ({...c, h: CH_DIRS[key].labels[c.k]}));
+}
+
+function chNorm(d, k){
+  const v = [7, 14, 21, 28].map(i => CH[addDays(d, -i)]).filter(Boolean).map(x => x[k]);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+// день ещё идёт: всё, что не раньше дня последнего обновления (полуночный прогон
+// перезаписывает закрытый день, и метка уходит на следующие сутки)
+const chLive = (d) => !!CH_UPD && d >= CH_UPD.slice(0, 10);
+
+function chCompute(){
+  let from = document.getElementById("from").value, to = document.getElementById("to").value;
+  if (from > to) [from, to] = [to, from];
+  const noWe = document.getElementById("noweekend").checked;
+  // период обрезается до дней, за которые лист вообще есть
+  const f = from < MINC ? MINC : from, t = to > MAXC ? MAXC : to;
+  const days = [];
+  for (let cur = f; cur <= t; cur = addDays(cur, 1)) if (!(noWe && [0, 6].includes(weekday(cur)))) days.push(cur);
+  const missing = days.filter(d => !CH[d]);
+  const closed = days.filter(d => CH[d] && !chLive(d));
+  const sum = {}, fN = {}, nN = {};
+  for (const c of CHS){
+    sum[c.k] = days.reduce((a, d) => a + (CH[d] ? CH[d][c.k] : 0), 0);
+    fN[c.k] = 0; nN[c.k] = null;
+    for (const d of closed){
+      const n = chNorm(d, c.k); if (n == null) continue;
+      fN[c.k] += CH[d][c.k]; nN[c.k] = (nN[c.k] || 0) + n;
+    }
+  }
+  return {from, to, noWe, days, missing, closed, sum, fN, nN, live: days.some(d => CH[d] && chLive(d))};
+}
+
+function devBadge(f, n){
+  if (n == null) return `<span class="dev na">нормы нет</span>`;
+  if (!n) return `<span class="dev na">норма 0</span>`;
+  const r = f / n - 1, p = Math.round(r * 100);
+  const t = p > 0 ? `▲ +${p}%` : p < 0 ? `▼ −${-p}%` : "0%";
+  if (n < SMALL_NORM) return `<span class="dev na" title="мало продаж для вывода">${t} · мало данных</span>`;
+  return `<span class="dev ${r >= -0.10 ? "good" : r >= -0.25 ? "warn" : "bad"}">${t}</span>`;
+}
+const n1 = (v) => v == null ? "—" : v.toLocaleString("ru-RU", {maximumFractionDigits: 1});
+
+function renderCh(){
+  const app = document.getElementById("app");
+  const dirChips = `<div class="chips" id="chDir" role="group" aria-label="Направление"><span class="chips-l">Направление:</span>${
+    Object.entries(CH_DIRS).map(([k, d]) => `<button type="button" data-d="${k}" class="${CH_DIR === k ? "on" : ""}" aria-pressed="${CH_DIR === k}">${d.name}</button>`).join("")}</div>`;
+  const bindDir = () => { document.getElementById("chDir").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b || b.dataset.d === CH_DIR) return;
+    useDir(b.dataset.d); setView("kanaly"); }; };
+  if (CH_ERR){
+    app.innerHTML = `<div style="margin-top:18px">${dirChips}</div><div class="state">Не получилось загрузить продажи по каналам ${CH_DIRS[CH_DIR].name} (${CH_ERR}). Лист заполняет отчёт по источникам ${CH_DIRS[CH_DIR].report} — если ошибка держится, его прогон не прошёл.</div>`;
+    bindDir();
+    return;
+  }
+  const R = chCompute();
+  const T = R.sum.total;
+  const notes = [];
+  if (R.live) notes.push(`Сегодняшний день ещё идёт (данные на ${CH_UPD.slice(11, 16)}) — в сравнение с нормой он не входит.`);
+  if (R.missing.length) notes.push(`Нет данных за ${R.missing.map(d => ru(d).slice(0, 5)).join(", ")} — эти дни пропущены и в факте, и в норме.`);
+  if (!R.closed.length) notes.push("В периоде нет закрытых дней — сравнивать с нормой пока не с чем.");
+
+  const rows = CHS.map(c => {
+    const avg = R.closed.length ? R.closed.reduce((a, d) => a + CH[d][c.k], 0) / R.closed.length : null;
+    return `<tr><td><span class="sw" style="--c:var(${c.c})"></span>${c.k === "total" ? "<b>Всего</b>" : c.h}</td>
+      <td>${int.format(R.sum[c.k])}</td><td>${n1(avg)}</td>
+      <td>${c.k === "total" || !T ? '<span class="dim">—</span>' : pct(R.sum[c.k] / T)}</td>
+      <td>${R.nN[c.k] == null ? '<span class="dim">—</span>' : `${int.format(R.fN[c.k])} / ${n1(R.nN[c.k])}`}</td>
+      <td>${devBadge(R.fN[c.k], R.nN[c.k])}</td></tr>`;
+  });
+
+  app.innerHTML = `
+  <section style="margin-top:18px">
+    ${dirChips}
+    <h2 id="chTitle">Продажи ${CH_DIRS[CH_DIR].name}: ${ru(R.from)} — ${ru(R.to)}${R.noWe ? ", без выходных" : ""}</h2>
+    <div class="chips" id="chStep" role="group" aria-label="Шаг графика"></div>
+    <div class="dyn">
+      <div class="ctiles" id="ctiles"></div>
+      <p class="dyn-hint">Нажмите на плитку, чтобы показать или скрыть линию канала. Под цифрой — доля в продажах и отклонение от нормы. Если оставить одну линию, пунктиром появится её норма.</p>
+      <div class="plots" id="plots"></div>
+    </div>
+    ${notes.map(t => `<p class="note">${t}</p>`).join("")}
+  </section>
+  <section>
+    <h2>По каналам</h2>
+    <div class="tablebox"><table class="ct">
+      <thead><tr><th scope="col">Канал</th><th scope="col">Продаж</th><th scope="col">В среднем за день</th>
+        <th scope="col">Доля</th><th scope="col">Факт / норма</th><th scope="col">К норме</th></tr></thead>
+      <tbody>${rows.slice(1).join("")}</tbody>
+      <tfoot>${rows[0]}</tfoot>
+    </table></div>
+    <p class="dim" style="font-size:12.5px;margin:8px 2px 0">«Факт / норма» — только за закрытые дни, у которых есть норма (4 прошлых таких же дня недели), поэтому факт здесь может быть меньше, чем в колонке «Продаж».</p>
+  </section>`;
+  bindDir();
+
+  const tiles = document.getElementById("ctiles");
+  tiles.innerHTML = CHS.map(c => `<button type="button" class="mtile" data-k="${c.k}" aria-pressed="${!!chOn[c.k]}" style="--c:var(${c.c})"
+      title="${chOn[c.k] ? "Скрыть" : "Показать"} линию «${c.h}» на графике">
+    <span class="h"><span class="cb" aria-hidden="true"></span><span class="sw"></span>${c.h}</span>
+    <span class="v">${int.format(R.sum[c.k])}</span>
+    <span class="s">${c.k !== "total" && T ? `<span>${pct(R.sum[c.k] / T)}</span>` : ""}${devBadge(R.fN[c.k], R.nN[c.k])}</span></button>`).join("");
+  tiles.onclick = (e) => { const b = e.target.closest(".mtile"); if (!b) return;
+    const k = b.dataset.k, next = {...chOn, [k]: !chOn[k]};
+    if (!Object.values(next).some(Boolean)) return;
+    chOn = next; store("chOn", chOn); renderCh(); };
+
+  const steps = document.getElementById("chStep");
+  steps.innerHTML = `<span class="chips-l">Шаг:</span>` +
+    [["day", "по дням"], ["week", "по неделям"]].map(([k, l]) =>
+      `<button type="button" data-s="${k}" class="${chStep === k ? "on" : ""}" aria-pressed="${chStep === k}">${l}</button>`).join("");
+  steps.onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    chStep = b.dataset.s; store("chStep", chStep); drawCh(LAST_CH); };
+
+  LAST_CH = R;
+  drawCh(R);
+}
+
+// точки графика: дни или календарные недели пн–вс (суммы); norm — сумма норм тех же дней
+function chSeries(R){
+  const day = R.days.map(d => ({d, d2:d, n: CH[d] ? 1 : 0, live: CH[d] ? chLive(d) : false,
+    v: CH[d] ? {...CH[d]} : null,
+    norm: Object.fromEntries(CHS.map(c => [c.k, CH[d] ? chNorm(d, c.k) : null]))}));
+  if (chStep !== "week") return day;
+  const out = [], idx = {};
+  for (const x of day){
+    const mon = addDays(x.d, -((weekday(x.d) + 6) % 7));
+    let w = idx[mon];
+    if (!w){ w = idx[mon] = {d:x.d, d2:x.d, n:0, live:false, v:null,
+      norm: Object.fromEntries(CHS.map(c => [c.k, null]))}; out.push(w); }
+    w.d2 = x.d;
+    if (!x.v) continue;
+    w.n++; w.live = w.live || x.live;
+    w.v = w.v || Object.fromEntries(CHS.map(c => [c.k, 0]));
+    for (const c of CHS){
+      w.v[c.k] += x.v[c.k];
+      if (x.norm[c.k] != null) w.norm[c.k] = (w.norm[c.k] || 0) + x.norm[c.k];
+    }
+  }
+  return out;
+}
+
+function drawCh(R){
+  if (!R) return;
+  document.querySelectorAll("#chStep button").forEach(b => { b.classList.toggle("on", b.dataset.s === chStep); b.setAttribute("aria-pressed", b.dataset.s === chStep); });
+  const host = document.getElementById("plots");
+  const S = chSeries(R), week = chStep === "week", fullWeek = R.noWe ? 5 : 7;
+  if (!S.length){ host.innerHTML = '<div class="state" style="margin:12px">В периоде нет дней с данными.</div>'; return; }
+  const on = CHS.filter(c => chOn[c.k]);
+  const showNorm = on.length === 1;                 // одна линия — рисуем и её норму
+  const W = Math.max(280, host.clientWidth || 600), narrow = W < 620;
+  const pL = 44, pR = narrow ? 16 : 122, H = narrow ? 300 : 380, top = 22, bot = 34, n = S.length;
+  const X = (i) => n === 1 ? (pL + W - pR) / 2 : pL + i * (W - pL - pR) / (n - 1);
+  const nice = (v) => {
+    if (!(v > 0)) return 4;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+    return [1, 1.2, 1.6, 2, 2.4, 3, 4, 5, 6, 8, 10].find(s => f <= s * 1.0001) * p;
+  };
+  const vals = S.flatMap(x => on.flatMap(c => [x.v ? x.v[c.k] : null, showNorm ? x.norm[c.k] : null])).filter(v => v != null);
+  const max = nice(Math.max(0, ...vals));
+  const Y = (v) => top + (H - top - bot) * (1 - v / max);
+  const grid = [0, .25, .5, .75, 1].map(f => {
+    const y = top + (H - top - bot) * f, v = max * (1 - f);
+    return `<line x1="${pL}" x2="${W - pR}" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:1;${f < 1 ? "opacity:.55" : ""}"/>
+      <text x="${pL - 8}" y="${y + 4}" text-anchor="end" style="fill:var(--muted);font-size:11.5px">${n1(Math.round(v * 10) / 10)}</text>`;
+  }).join("");
+  const step = Math.max(1, Math.ceil(n / (narrow ? 5 : 10)));
+  const axis = S.map((x, i) => (i % step === 0 || i === n - 1) && !(i !== n - 1 && n - 1 - i < step / 2)
+    ? `<text x="${X(i).toFixed(1)}" y="${H - 12}" text-anchor="${n === 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle"}"
+         style="fill:var(--muted);font-size:11.5px">${x.d.slice(8)}.${x.d.slice(5, 7)}</text>` : "").join("");
+  const path = (get) => { let d = "", pen = false;
+    S.forEach((x, i) => { const v = get(x); if (v == null){ pen = false; return; }
+      d += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); pen = true; });
+    return d; };
+  const hollow = (x) => x.live || (week && x.n < fullWeek);
+  // «Всего» снизу и толще: он не канал, а сумма; каналы поверх
+  const lines = on.map(c => {
+    const w = c.k === "total" ? 2.75 : 2.25;
+    const norm = showNorm ? `<path d="${path(x => x.norm[c.k])}" fill="none" style="stroke:var(${c.c});stroke-width:1.75;stroke-dasharray:5 4;opacity:.75"/>` : "";
+    const dots = n <= 62 ? S.map((x, i) => !x.v ? "" : hollow(x)
+      ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(x.v[c.k]).toFixed(1)}" r="3.5" style="fill:var(--panel);stroke:var(${c.c});stroke-width:2"/>`
+      : `<circle cx="${X(i).toFixed(1)}" cy="${Y(x.v[c.k]).toFixed(1)}" r="3" style="fill:var(${c.c});stroke:var(--panel);stroke-width:1.5"/>`).join("") : "";
+    return `${norm}<path d="${path(x => x.v ? x.v[c.k] : null)}" fill="none" style="stroke:var(${c.c});stroke-width:${w};stroke-linejoin:round;stroke-linecap:round"/>${dots}`;
+  }).join("");
+  // подписи у конца линий (цвет — у штриха, текст — цветом текста); на телефоне их
+  // заменяют плитки сверху. Подписи разводятся, чтобы не налезали друг на друга.
+  let ends = "";
+  if (!narrow){
+    const last = S.map((x, i) => [x, i]).filter(([x]) => x.v).pop();
+    if (last){
+      const lab = on.map(c => ({c, y: Y(last[0].v[c.k])})).sort((a, b) => a.y - b.y);
+      for (let i = 1; i < lab.length; i++) lab[i].y = Math.max(lab[i].y, lab[i - 1].y + 15);
+      const x0 = X(last[1]) + 10;
+      ends = lab.map(({c, y}) => `<line x1="${x0}" x2="${x0 + 10}" y1="${y}" y2="${y}" style="stroke:var(${c.c});stroke-width:3;stroke-linecap:round"/>
+        <text x="${x0 + 15}" y="${y + 4}" style="fill:var(--ink);font-size:12px;font-weight:600">${c.h} ${int.format(last[0].v[c.k])}</text>`).join("");
+    }
+  }
+  const hps = on.map(c => `<circle class="hp" data-k="${c.k}" r="5.5" cx="-10" cy="-10" style="fill:var(${c.c});stroke:var(--panel);stroke-width:2"/>`).join("");
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Продажи по каналам ${week ? "по неделям" : "по дням"}">
+      ${grid}${axis}
+      <line class="xh" x1="-10" x2="-10" y1="${top}" y2="${H - bot}" style="stroke:var(--ink);stroke-width:1;opacity:0"/>
+      ${lines}${ends}${hps}
+    </svg>
+    <p class="scale-note">${showNorm ? "Пунктир — норма: среднее 4 прошлых таких же дней недели. " : ""}${
+      on.some(c => c.k === "total") && on.length > 1 ? "Выключите «Всего», чтобы линии каналов стали крупнее. " : ""}${
+      S.some(hollow) ? (week ? "Пустая точка — неделя неполная или ещё идёт, сравнивать её с полными нельзя." : "Пустая точка — день ещё идёт.") : ""}</p>
+    <div class="tip" id="tip" hidden></div>`;
+
+  const tip = document.getElementById("tip");
+  const move = (ev) => {
+    const rect = host.querySelector("svg").getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round(n === 1 ? 0 : (px - pL) / ((W - pL - pR) / (n - 1)))));
+    const x = S[i];
+    const xh = host.querySelector(".xh");
+    xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.style.opacity = .35;
+    host.querySelectorAll(".hp").forEach(c => {
+      if (!x.v) c.setAttribute("cx", -10);
+      else { c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(x.v[c.dataset.k])); }
+    });
+    const head = week
+      ? `<b>${ru(x.d).slice(0, 5)} — ${ru(x.d2)}</b>${x.n < fullWeek ? `<div class="w">неполная неделя: ${x.n} из ${fullWeek} дн.</div>` : ""}`
+      : `<b>${WD[weekday(x.d)]}, ${ru(x.d)}</b>`;
+    tip.innerHTML = head + (!x.v ? `<div class="w">нет данных</div>` : CHS.map(c =>
+      `<div class="r"><span><i style="--c:var(${c.c})"></i>${c.h}</span><span>${int.format(x.v[c.k])}${
+        x.norm[c.k] != null && !x.live ? ` <span style="opacity:.7">/ ${n1(x.norm[c.k])}</span>` : ""}</span></div>`).join("")
+      + `<div class="w">${x.live ? `день ещё идёт, данные на ${CH_UPD.slice(11, 16)}` : "через «/» — норма"}</div>`);
+    tip.hidden = false;
+    const hr = host.getBoundingClientRect();
+    const tx = ev.clientX - hr.left, tw = tip.offsetWidth;
+    tip.style.left = Math.max(4, Math.min(hr.width - tw - 4, tx + 14 > hr.width - tw ? tx - tw - 14 : tx + 14)) + "px";
+    tip.style.top = Math.max(4, Math.min(H - tip.offsetHeight, ev.clientY - hr.top - tip.offsetHeight / 2)) + "px";
+  };
+  const leave = () => {
+    tip.hidden = true;
+    host.querySelector(".xh").style.opacity = 0;
+    host.querySelectorAll(".hp").forEach(c => c.setAttribute("cx", -10));
+  };
+  host.onpointermove = move; host.onpointerdown = move; host.onpointerleave = leave;
+}
+
+let resizeT = null;
+addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() =>
+  VIEW === "kanaly" ? drawCh(LAST_CH) : LAST_R && drawDyn(LAST_R), 150); });
+
+document.getElementById("presets").addEventListener("click", e => {
+  const b = e.target.closest("button.p"); if (!b) return;
+  applyPreset(b.dataset.p); render();
+});
+for (const id of ["from", "to"]) document.getElementById(id).addEventListener("change", () => {
+  setRange(document.getElementById("from").value, document.getElementById("to").value, null); render();
+});
+document.getElementById("noweekend").addEventListener("change", e => { store("noweekend", e.target.checked); render(); });
+
+init();
+</script>
+</body>
+</html>
