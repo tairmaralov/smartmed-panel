@@ -302,17 +302,17 @@ table.ct .sw{display:inline-block; width:14px; height:0; border-top:3px solid va
 <script>
 const SHEET = "1eabC8Sh8_bnG9y0WgP4ypPzDDagU7HGocaLcq1BpNas";
 /* Направления раздела «Таргет по кодам». SmartMed добавлен 19.10.2026 (просьба
-   пользователя): его таблица кодов устроена так же, а лист «Расход» в ней собирается
-   из выгрузки Ads Manager ПО ОБЪЯВЛЕНИЯМ — у SmartMed код крео живёт не в названии
-   кампании, а в заранее подготовленном сообщении объявления. Окно from/to — дни,
-   за которые есть такой расход: лиды и продажи вне окна не показываются, иначе
-   цены считались бы по чужим дням. */
+   пользователя): его таблица кодов устроена так же, а лист «Расход» в ней — расход
+   кампаний SmartMed и SmartMed2 из Envidicy (hierarchy-daily); код — первое число
+   в начале названия кампании («[008] 010 дубль» → 08). Окно from/to — дни, за которые
+   этот расход собран: лиды и продажи вне окна не показываются, иначе цены считались
+   бы по дням без бюджета. */
 const KODY_DIRS = {
   sl: {name:"SmartLab", sheet:SHEET, organic:"340222", cabinet:"SmartLab2",
-       spendHow:"расход по кампаниям — из Envidicy по API (обновляется 6 раз в день), код крео берётся из названия кампании. Разбивка по кампаниям у Envidicy есть с 12.09.2026 — за 01–11.09 бюджета нет"},
+       spendHow:"расход по кампаниям — из Envidicy по API (обновляется каждый час 08–23 и в 00), код крео берётся из названия кампании. Разбивка по кампаниям у Envidicy есть с 12.09.2026 — за 01–11.09 бюджета нет"},
   sm: {name:"SmartMed", sheet:"11kmLkM-XkCeN7wPWnJB7uguCChL_7qvFT4RZUJVxxFI", organic:"780808",
        cabinet:"SmartMed и SmartMed2", from:"2026-10-13", to:"2026-10-18",
-       spendHow:"код крео берётся из заранее подготовленного сообщения каждого объявления"},
+       spendHow:"расход по кампаниям — из Envidicy, код крео — первое число в начале названия кампании («[008] 010 дубль» → 08); у каждой кампании одно объявление, так что это и есть расход креатива. Кампания без числа в начале («d021 [перезапуск]») в бюджет кодов не входит"},
 };
 delete KODY_DIRS.sm;   // Envidicy: пока только SmartLab
 let ORGANIC = "340222";
@@ -425,7 +425,7 @@ function setView(v, first){
   document.getElementById("footKody").hidden = v !== "kody";
   document.getElementById("footKodyText").innerHTML =
     `Бюджет — расход кабинет${KODY_DIR === "sm" ? "ов" : "а"} ${KDIR.cabinet}; ${KDIR.spendHow}.`
-    + (KDIR.from ? ` Данные SmartMed показаны за ${ru(KDIR.from)} — ${ru(KDIR.to)}: за эти дни собран расход по объявлениям.` : "")
+    + (KDIR.from ? ` Данные SmartMed показаны за ${ru(KDIR.from)} — ${ru(KDIR.to)}: за эти дни собран расход.` : "")
     + ` У органики Instagram (код ${KDIR.organic}) бюджета нет, поэтому цены лида и продажи у неё не считаются.`;
   const src = document.getElementById("footKodySrc");
   src.href = `https://docs.google.com/spreadsheets/d/${KDIR.sheet}/edit`; src.textContent = `таблица кодов ${KDIR.name}`;
@@ -604,7 +604,7 @@ function renderKody(){
   }).join("");
 
   const coverage = R.budgetDays < R.totalDays
-    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed по объявлениям собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Расход по кампаниям Envidicy отдаёт с 12.09.2026: за 01–11.09 весь расход кабинета у него «Кампания не определена», по кодам его не разложить."}</p>`
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Расход по кампаниям Envidicy отдаёт с 12.09.2026: за 01–11.09 весь расход кабинета у него «Кампания не определена», по кодам его не разложить."}</p>`
     : "";
   const partialDays = Object.keys(R.partial).sort();
   const partialNote = partialDays.length
