@@ -311,10 +311,9 @@ const KODY_DIRS = {
   sl: {name:"SmartLab", sheet:SHEET, organic:"340222", cabinet:"SmartLab2",
        spendHow:"расход по кампаниям — из Envidicy по API (обновляется каждый час 08–23 и в 00), код крео берётся из названия кампании. Разбивка по кампаниям у Envidicy есть с 12.09.2026 — за 01–11.09 бюджета нет"},
   sm: {name:"SmartMed", sheet:"11kmLkM-XkCeN7wPWnJB7uguCChL_7qvFT4RZUJVxxFI", organic:"780808",
-       cabinet:"SmartMed и SmartMed2", from:"2026-10-13", to:"2026-10-18",
-       spendHow:"расход по кампаниям — из Envidicy, код крео — первое число в начале названия кампании («[008] 010 дубль» → 08); у каждой кампании одно объявление, так что это и есть расход креатива. Кампания без числа в начале («d021 [перезапуск]») в бюджет кодов не входит"},
+       cabinet:"SmartMed и SmartMed2",
+       spendHow:"расход по кампаниям — из Envidicy по API (обновляется каждый час 08–23 и в 00), разбивка по кампаниям у Envidicy есть с 12.09.2026; код крео — первое число в начале названия кампании («[008] 010 дубль» → 08); у каждой кампании одно объявление, так что это и есть расход креатива. Кампания без числа в начале («d021 [перезапуск]») в бюджет кодов не входит"},
 };
-delete KODY_DIRS.sm;   // Envidicy: пока только SmartLab
 let ORGANIC = "340222";
 const NOCODE = "без кода";
 const THEMES = {
@@ -360,7 +359,7 @@ function ru(s){ const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; }
 
 let CODES_ERR = "";
 const KD = {};          // по направлению: {DAYS, SPEND, TAG, MAXD, MAXS, ERR}
-let KODY_DIR = location.hash === "#kody-sm" ? "sl" : location.hash === "#kody" ? "sl"
+let KODY_DIR = location.hash === "#kody-sm" ? "sm" : location.hash === "#kody" ? "sl"
   : (load("kodyDir") === "sm" ? "sm" : "sl");
 
 async function loadKody(key){
@@ -604,7 +603,7 @@ function renderKody(){
   }).join("");
 
   const coverage = R.budgetDays < R.totalDays
-    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? `Бюджет SmartMed собран за ${ru(KODY_DIRS.sm.from)} — ${ru(KODY_DIRS.sm.to)}.` : "Расход по кампаниям Envidicy отдаёт с 12.09.2026: за 01–11.09 весь расход кабинета у него «Кампания не определена», по кодам его не разложить."}</p>`
+    ? `<p class="note">Бюджет есть за ${R.budgetDays} из ${R.totalDays} дн. периода — цены лида и продажи посчитаны только по дням с бюджетом, а лиды и продажи — за весь период, поэтому цены занижены. ${KODY_DIR === "sm" ? "Расход по кампаниям Envidicy отдаёт с 12.09.2026. Кампании без числа в начале названия (в сентябре — почти все: кодов у SmartMed тогда не было) в бюджет кодов не входят." : "Расход по кампаниям Envidicy отдаёт с 12.09.2026: за 01–11.09 весь расход кабинета у него «Кампания не определена», по кодам его не разложить."}</p>`
     : "";
   const partialDays = Object.keys(R.partial).sort();
   const partialNote = partialDays.length
